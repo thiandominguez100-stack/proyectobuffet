@@ -1,5 +1,14 @@
+import { auth, db } from "./firebase.js";
+
 (function () {
   "use strict";
+
+  // Inicializa Firebase en la aplicación. En esta etapa no realiza lecturas
+  // ni escrituras: Firestore permanece cerrado por reglas de seguridad.
+  if (auth && db) {
+    document.documentElement.setAttribute("data-firebase", "connected");
+  }
+
   var root = document.documentElement;
   var savedTheme = null;
 
@@ -48,7 +57,7 @@
   if ("serviceWorker" in navigator && window.location.protocol === "https:") {
     window.addEventListener("load", function () {
       navigator.serviceWorker.register("/sw.js").catch(function () {
-        // La aplicación sigue disponible si el service worker no puede instalarse.
+        // La aplicación sigue funcionando si el service worker no puede instalarse.
       });
     });
   }
