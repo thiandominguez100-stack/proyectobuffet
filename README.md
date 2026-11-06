@@ -23,12 +23,13 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 ## Reglas funcionales acordadas
 
 - Productos iniciales: Bizcochos ($500) y Facturas ($1.000).
-- Pedidos: de 13:00 a 17:00, hora de Argentina.
+- Pedidos: de 13:00 inclusive a antes de las 17:00, hora de Argentina.
 - Retiro: 08:50–09:00 o 10:20–10:30.
 - Los pedidos se asignan al próximo día habilitado en el calendario escolar.
 - Métodos de pago: efectivo y Mercado Pago.
 - No se almacenarán comprobantes como imágenes en Firebase Storage. La verificación de Mercado Pago será manual.
-- Los alumnos tendrán cuenta individual con correo real y contraseña.
+- Los alumnos tendrán cuenta individual con correo real verificado y contraseña.
+- Límite diario: 5 unidades totales por alumno y jornada, combinando Bizcochos y Facturas.
 - Los roles previstos son alumno, personal y administrador.
 
 ## Estructura
