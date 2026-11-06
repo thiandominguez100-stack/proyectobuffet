@@ -1,0 +1,76 @@
+"use strict";
+var CACHE_NAME = "buffet411-shell-v1";
+var APP_SHELL = [
+  "/",
+  "/index.html",
+  "/personal.html",
+  "/css/app.css",
+  "/js/app.js",
+  "/manifest.webmanifest",
+  "/favicon.svg"
+];
+
+self.addEventListener("install", function (event) {
+  event.waitUntil((async function () {
+    var cache = await caches.open(CACHE_NAME);
+    for (var i = 0; i < APP_SHELL.length; i += 1) {
+      try {
+        await cache.add(APP_SHELL[i]);
+      } catch (error) {
+        // Un recurso opcional ausente no debe cancelar toda la instalación.
+      }
+    }
+    await self.skipWaiting();
+  })());
+});
+
+self.addEventListener("activate", function (event) {
+  event.waitUntil((async function () {
+    var keys = await caches.keys();
+    await Promise.all(keys.filter(function (key) {
+      return key.indexOf("buffet411-shell-") === 0 && key !== CACHE_NAME;
+    }).map(function (key) {
+      return caches.delete(key);
+    }));
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener("fetch", function (event) {
+  var request = event.request;
+  var url = new URL(request.url);
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (url.pathname.indexOf("/__/") === 0 || url.pathname.indexOf("/api/") === 0) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith((async function () {
+      try {
+        var fresh = await fetch(request);
+        if (fresh && fresh.ok) {
+          var cache = await caches.open(CACHE_NAME);
+          cache.put(request, fresh.clone()).catch(function () {});
+        }
+        return fresh;
+      } catch (error) {
+        var cached = await caches.match(request);
+        return cached || caches.match("/index.html");
+      }
+    })());
+    return;
+  }
+
+  event.respondWith((async function () {
+    var cached = await caches.match(request);
+    if (cached) return cached;
+    try {
+      var response = await fetch(request);
+      if (response && response.ok) {
+        var cache = await caches.open(CACHE_NAME);
+        cache.put(request, response.clone()).catch(function () {});
+      }
+      return response;
+    } catch (error) {
+      return Response.error();
+    }
+  })());
+});
