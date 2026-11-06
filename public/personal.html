@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d2a40">
+  <meta name="description" content="Panel interno de gestión del Buffet 411.">
+  <title>Buffet 411 | Personal</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <script src="/js/app.js" defer></script>
+</head>
+<body class="staff-page">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Buffet 411, inicio">
+      <span class="brand-mark">B<span>411</span></span>
+      <span class="brand-copy"><strong>Buffet 411</strong><small>Panel del personal</small></span>
+    </a>
+    <nav class="top-actions"><a class="nav-link" href="/">Vista de alumnos</a><button class="icon-button" type="button" data-toggle-theme aria-label="Cambiar tema" title="Cambiar tema">◐</button></nav>
+  </header>
+
+  <main class="staff-layout wrap">
+    <aside class="staff-sidebar">
+      <span class="eyebrow">ÁREA INTERNA</span>
+      <h1>Gestión del buffet</h1>
+      <p>Herramientas para organizar la próxima jornada.</p>
+      <div class="sidebar-menu">
+        <a class="sidebar-item selected" href="#resumen"><span>▦</span> Resumen</a>
+        <a class="sidebar-item" href="#produccion"><span>▤</span> Producción</a>
+        <a class="sidebar-item" href="#pedidos"><span>≡</span> Pedidos</a>
+        <a class="sidebar-item" href="#productos"><span>◇</span> Productos y stock</a>
+        <a class="sidebar-item" href="#calendario"><span>▦</span> Calendario</a>
+        <a class="sidebar-item" href="#pagos"><span>$</span> Pagos</a>
+      </div>
+      <div class="sidebar-bottom"><span class="secure-mark">⌑</span><span><strong>Acceso protegido</strong><small>Solo personal autorizado</small></span></div>
+    </aside>
+
+    <section class="staff-main">
+      <div class="staff-heading" id="resumen"><div><span class="eyebrow">PANEL OPERATIVO</span><h2>Resumen de producción</h2><p>Vista inicial del área de personal.</p></div><span class="prototype-badge"><i></i> PROTOTIPO</span></div>
+
+      <div class="security-notice"><span class="notice-icon">!</span><div><strong>Panel todavía no habilitado</strong><p>La autenticación y los permisos del personal todavía no están conectados. Esta pantalla es una maqueta visual: no muestra pedidos reales ni permite realizar cambios.</p></div></div>
+
+      <div class="staff-stats">
+        <article class="stat-card"><span>PRÓXIMA JORNADA</span><strong>—</strong><small>Se calculará con el calendario escolar</small></article>
+        <article class="stat-card"><span>PEDIDOS RECIBIDOS</span><strong>—</strong><small>Datos disponibles al conectar Firestore</small></article>
+        <article class="stat-card"><span>BIZCOCHOS</span><strong>—</strong><small>Total para preparar o comprar</small></article>
+        <article class="stat-card"><span>FACTURAS</span><strong>—</strong><small>Total para preparar o comprar</small></article>
+      </div>
+
+      <section class="staff-card" id="produccion">
+        <div class="card-heading"><div><span class="eyebrow">PRODUCCIÓN</span><h3>Totales por horario de retiro</h3></div><span class="muted-label">SIN DATOS TODAVÍA</span></div>
+        <div class="production-table">
+          <div class="production-row production-head"><span>HORARIO</span><span>BIZCOCHOS</span><span>FACTURAS</span></div>
+          <div class="production-row"><strong>08:50 — 09:00</strong><span>—</span><span>—</span></div>
+          <div class="production-row"><strong>10:20 — 10:30</strong><span>—</span><span>—</span></div>
+        </div>
+        <p class="table-footnote">Los totales se calcularán a partir de pedidos confirmados para la próxima jornada habilitada.</p>
+      </section>
+
+      <div class="staff-two-col">
+        <section class="staff-card" id="pedidos"><div class="card-heading"><div><span class="eyebrow">ORGANIZACIÓN</span><h3>Pedidos por curso</h3></div></div><div class="empty-state"><span>≡</span><strong>La lista aparecerá acá</strong><p>Se agruparán los encargos por curso y división.</p></div></section>
+        <section class="staff-card" id="productos"><div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y stock</h3></div></div><div class="mini-product"><span class="mini-product-mark">B</span><span><strong>Bizcochos</strong><small>Precio inicial: $500</small></span><span class="muted-label">Pendiente</span></div><div class="mini-product"><span class="mini-product-mark">F</span><span><strong>Facturas</strong><small>Precio inicial: $1.000</small></span><span class="muted-label">Pendiente</span></div></section>
+      </div>
+
+      <div class="staff-two-col">
+        <section class="staff-card" id="calendario"><div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div><div class="empty-state compact"><span>▦</span><strong>Calendario editable</strong><p>Se podrán marcar feriados, vacaciones y días sin clases.</p></div></section>
+        <section class="staff-card" id="pagos"><div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div><div class="empty-state compact"><span>$</span><strong>Verificación manual</strong><p>El personal podrá confirmar efectivo o Mercado Pago.</p></div></section>
+      </div>
+      <div class="staff-bottom-link"><a class="button button-outline" href="/">← Volver a la página de alumnos</a><span>El acceso real se habilitará después de configurar los roles y reglas de seguridad.</span></div>
+    </section>
+  </main>
+  <footer class="site-footer wrap"><span>Buffet 411 · Panel interno</span><span class="footer-status"><i></i> Prototipo visual</span></footer>
+</body>
+</html>
