@@ -4,14 +4,14 @@
   "short_name": "Buffet 411",
   "description": "Encargos escolares del Buffet 411",
   "lang": "es-AR",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#edf0f3",
   "theme_color": "#0d2a40",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "./favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
