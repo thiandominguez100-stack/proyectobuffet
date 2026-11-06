@@ -2,13 +2,13 @@
 var CACHE_NAME = "buffet411-shell-v1";
 var APP_SHELL = [
   "/",
-  "/index.html",
-  "/personal.html",
-  "/css/app.css",
-  "/js/app.js",
-  "/js/firebase.js",
-  "/manifest.webmanifest",
-  "/favicon.svg"
+  "./index.html",
+  "./personal.html",
+  "./css/app.css",
+  "./js/app.js",
+  "./js/firebase.js",
+  "./manifest.webmanifest",
+  "./favicon.svg"
 ];
 
 self.addEventListener("install", function (event) {
@@ -57,7 +57,7 @@ self.addEventListener("fetch", function (event) {
       var cached = await caches.match(request);
       if (cached) return cached;
       if (request.mode === "navigate") {
-        return (await caches.match("/index.html")) || Response.error();
+        return (await caches.match("./index.html")) || Response.error();
       }
       return Response.error();
     }
