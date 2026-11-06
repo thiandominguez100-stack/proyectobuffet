@@ -8,7 +8,8 @@
 - Verificación de correo antes de permitir pedidos.
 - Perfil con nombre, curso y división.
 - Catálogo de Bizcochos y Facturas.
-- Carrito y selección de horario de retiro.
+- Carrito con un máximo de 5 unidades combinadas por alumno y jornada.
+- Selección de horario de retiro.
 - Confirmación, historial y cancelación dentro del plazo.
 - Recuperación de contraseña mediante Firebase Authentication.
 
@@ -30,6 +31,7 @@
 - Horarios de retiro: 08:50–09:00 y 10:20–10:30.
 - Calendario escolar editable: días sin clases, feriados y jornadas habilitadas.
 - Precios iniciales: Bizcochos $500; Facturas $1.000.
+- Límite diario combinado: 5 unidades en total por alumno y jornada, sumando ambos productos y todos sus pedidos.
 - Precios y disponibilidad podrán ser modificados por roles autorizados.
 - Pagos: efectivo o Mercado Pago. El estado de pago lo confirma manualmente el personal.
 - No usar Firebase Storage ni subir comprobantes de pago como imágenes.
@@ -50,7 +52,7 @@ La asignación de roles privilegiados nunca se hará desde un campo que el propi
 - `dailyAvailability/{date}`: disponibilidad/stock por producto.
 - `settings/app`: horarios, precios y parámetros operativos.
 - `activity/{eventId}`: auditoría de acciones administrativas.
-- `studentDailyTotals/{uid_date}`: contador diario para aplicar el límite por alumno.
+- `studentDailyTotals/{uid_date}`: contador diario global por alumno/jornada. La suma de bizcochos y facturas, entre todos sus pedidos para esa fecha, nunca podrá superar 5.
 
 El modelo final debe validarse junto con las reglas de Firestore. Las operaciones que afectan al pedido y al contador diario deberán ser atómicas y estar verificadas por reglas; no alcanza con validar solamente desde JavaScript.
 
@@ -64,8 +66,7 @@ El modelo final debe validarse junto con las reglas de Firestore. Las operacione
 
 ## Límites y decisiones pendientes
 
-1. Confirmar si el máximo diario es 5 unidades combinadas o hasta 5 de cada producto.
-2. Definir el comportamiento exacto de cancelación: el límite de las 17:00 del día anterior a la jornada de retiro.
-3. Definir si al eliminar una cuenta se borran los pedidos asociados o se anonimizan para estadísticas.
-4. Definir el proceso de alta y autorización del personal.
-5. Acordar con la escuela qué datos de alumnos son realmente necesarios y quién puede acceder a ellos.
+1. Definir el comportamiento exacto de cancelación: el límite de las 17:00 del día anterior a la jornada de retiro.
+2. Definir si al eliminar una cuenta se borran los pedidos asociados o se anonimizan para estadísticas.
+3. Definir el proceso de alta y autorización del personal.
+4. Acordar con la escuela qué datos de alumnos son realmente necesarios y quién puede acceder a ellos.
