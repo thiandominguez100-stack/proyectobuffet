@@ -67,7 +67,7 @@
           <div class="product-info">
             <div class="product-title-line"><div><span class="product-category">PANIFICADOS</span><h3>Bizcochos</h3></div><span class="availability-dot" aria-label="Disponibilidad pendiente"></span></div>
             <div class="product-bottom"><strong class="price">$500</strong><span class="status-soft">Disponibilidad al abrir pedidos</span></div>
-            <button class="button button-disabled" type="button" disabled>Pedidos próximamente</button>
+            <button class="button button-outline" type="button" data-add-product="bizcochos">Agregar bizcochos</button>
           </div>
         </article>
         <article class="product-card">
@@ -75,10 +75,25 @@
           <div class="product-info">
             <div class="product-title-line"><div><span class="product-category">PANIFICADOS</span><h3>Facturas</h3></div><span class="availability-dot" aria-label="Disponibilidad pendiente"></span></div>
             <div class="product-bottom"><strong class="price">$1.000</strong><span class="status-soft">Disponibilidad al abrir pedidos</span></div>
-            <button class="button button-disabled" type="button" disabled>Pedidos próximamente</button>
+            <button class="button button-outline" type="button" data-add-product="facturas">Agregar facturas</button>
           </div>
         </article>
       </div>
+
+      <section class="cart-panel" id="carrito" aria-labelledby="cart-title">
+        <div class="cart-heading">
+          <div><span class="eyebrow">TU ENCARGO</span><h3 id="cart-title">Carrito de prueba</h3><p>Hasta 5 productos en total por alumno y jornada.</p></div>
+          <span class="cart-count"><strong data-cart-count>0</strong><small>/ 5 unidades</small></span>
+        </div>
+        <div class="cart-list" data-cart-list aria-live="polite">
+          <p class="cart-empty">Todavía no agregaste productos. Elegí bizcochos o facturas para probar el límite.</p>
+        </div>
+        <div class="cart-bottom">
+          <div class="cart-total"><span>Total estimado</span><strong data-cart-total>$0</strong></div>
+          <button class="button button-disabled" type="button" disabled>Confirmar pedido · próximamente</button>
+        </div>
+        <p class="cart-feedback" data-cart-feedback role="status" aria-live="polite">Este carrito es una demostración local. Todavía no guarda ni envía pedidos.</p>
+      </section>
       <p class="photo-note"><strong>Próxima mejora:</strong> reemplazaremos estos espacios por fotografías reales de los productos del buffet.</p>
     </section>
 
