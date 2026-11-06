@@ -6,6 +6,7 @@ var APP_SHELL = [
   "/personal.html",
   "/css/app.css",
   "/js/app.js",
+  "/js/firebase.js",
   "/manifest.webmanifest",
   "/favicon.svg"
 ];
@@ -42,34 +43,22 @@ self.addEventListener("fetch", function (event) {
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
   if (url.pathname.indexOf("/__/") === 0 || url.pathname.indexOf("/api/") === 0) return;
 
-  if (request.mode === "navigate") {
-    event.respondWith((async function () {
-      try {
-        var fresh = await fetch(request);
-        if (fresh && fresh.ok) {
-          var cache = await caches.open(CACHE_NAME);
-          cache.put(request, fresh.clone()).catch(function () {});
-        }
-        return fresh;
-      } catch (error) {
-        var cached = await caches.match(request);
-        return cached || caches.match("/index.html");
-      }
-    })());
-    return;
-  }
-
+  // Network-first: las versiones nuevas llegan al navegador al publicar cambios.
+  // La caché es solo un respaldo para recursos estáticos sin conexión.
   event.respondWith((async function () {
-    var cached = await caches.match(request);
-    if (cached) return cached;
     try {
-      var response = await fetch(request);
-      if (response && response.ok) {
+      var fresh = await fetch(request);
+      if (fresh && fresh.ok) {
         var cache = await caches.open(CACHE_NAME);
-        cache.put(request, response.clone()).catch(function () {});
+        cache.put(request, fresh.clone()).catch(function () {});
       }
-      return response;
+      return fresh;
     } catch (error) {
+      var cached = await caches.match(request);
+      if (cached) return cached;
+      if (request.mode === "navigate") {
+        return (await caches.match("/index.html")) || Response.error();
+      }
       return Response.error();
     }
   })());
