@@ -13,6 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./css/app.css">
   <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/staff.js"></script>
 </head>
 <body class="staff-page">
   <header class="topbar">
@@ -23,7 +24,24 @@
     <nav class="top-actions"><a class="nav-link" href="./index.html">Vista de alumnos</a><button class="icon-button" type="button" data-toggle-theme aria-label="Cambiar tema" title="Cambiar tema">◐</button></nav>
   </header>
 
-  <main class="staff-layout wrap">
+  <section class="staff-auth-wrap wrap" id="staff-auth">
+    <div class="staff-auth-card">
+      <span class="eyebrow">ÁREA RESTRINGIDA</span>
+      <h1>Acceso del personal</h1>
+      <p>Ingresá con la cuenta autorizada por la administración de Buffet 411.</p>
+      <form id="staff-login-form" class="staff-login-form">
+        <label for="staff-email">Correo electrónico</label>
+        <input id="staff-email" name="email" type="email" autocomplete="username" required>
+        <label for="staff-password">Contraseña</label>
+        <input id="staff-password" name="password" type="password" autocomplete="current-password" minlength="8" required>
+        <button class="button button-primary" id="staff-login-submit" type="submit">Ingresar</button>
+      </form>
+      <p class="staff-auth-message" id="staff-auth-message" role="status" aria-live="polite">Solo pueden ingresar cuentas con rol de personal o administrador.</p>
+      <a class="button button-quiet" href="./index.html">← Volver a alumnos</a>
+    </div>
+  </section>
+
+  <main class="staff-layout wrap" id="staff-dashboard" hidden>
     <aside class="staff-sidebar">
       <span class="eyebrow">ÁREA INTERNA</span>
       <h1>Gestión del buffet</h1>
@@ -70,7 +88,7 @@
         <section class="staff-card" id="calendario"><div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div><div class="empty-state compact"><span>▦</span><strong>Calendario editable</strong><p>Se podrán marcar feriados, vacaciones y días sin clases.</p></div></section>
         <section class="staff-card" id="pagos"><div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div><div class="empty-state compact"><span>$</span><strong>Verificación manual</strong><p>El personal podrá confirmar efectivo o Mercado Pago.</p></div></section>
       </div>
-      <div class="staff-bottom-link"><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>El acceso real se habilitará después de configurar los roles y reglas de seguridad.</span></div>
+      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>El acceso real se habilitará después de configurar los roles y reglas de seguridad.</span></div>
     </section>
   </main>
   <footer class="site-footer wrap"><span>Buffet 411 · Panel interno</span><span class="footer-status"><i></i> Prototipo visual</span></footer>
