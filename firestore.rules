@@ -2,9 +2,15 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Cierre seguro inicial.
-    // No habilitar lecturas ni escrituras hasta que se incorporen y prueben
-    // las reglas específicas para alumnos, personal y administradores.
+    // Cada usuario autenticado puede consultar únicamente su propio rol.
+    // Los roles se asignan manualmente desde Firebase Console; nunca desde el cliente.
+    match /staffRoles/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, create, update, delete: if false;
+    }
+
+    // Todo lo demás permanece cerrado hasta implementar y probar
+    // reglas específicas para alumnos, pedidos y administración.
     match /{document=**} {
       allow read, write: if false;
     }
