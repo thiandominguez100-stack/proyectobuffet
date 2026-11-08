@@ -133,9 +133,13 @@ test("un alumno puede consumir un código una sola vez al crear su perfil", asyn
   const profile = await getDoc(doc(db, "users", "student-2"));
   assert.equal(profile.data().registrationCodeId, code);
 
-  const usedCode = await getDoc(doc(db, "enrollmentCodes", code));
-  assert.equal(usedCode.data().status, "used");
-  assert.equal(usedCode.data().usedBy, "student-2");
+  let usedCodeData;
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const usedCode = await getDoc(doc(context.firestore(), "enrollmentCodes", code));
+    usedCodeData = usedCode.data();
+  });
+  assert.equal(usedCodeData.status, "used");
+  assert.equal(usedCodeData.usedBy, "student-2");
 });
 
 test("un segundo alumno no puede reutilizar un código consumido", async () => {
