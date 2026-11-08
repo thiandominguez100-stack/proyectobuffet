@@ -323,13 +323,23 @@ registerForm.addEventListener("submit", async (event) => {
 
     if (preserveAccount) {
       showVerificationPanel();
-      showFeedback("La cuenta se creó correctamente. Revisá tu correo; si no recibiste el mensaje, podés reenviarlo desde esta pantalla.", "success");
+      try {
+        await sendEmailVerification(newUser);
+        showFeedback("La cuenta se creó correctamente. Te enviamos el correo de verificación; si no lo recibís, podés reenviarlo desde esta pantalla.", "success");
+      } catch (mailError) {
+        console.error("No se pudo enviar la verificación tras recuperar el registro:", mailError);
+        showFeedback("La cuenta se creó correctamente, pero no pudimos enviar el correo. Tocá «Reenviar correo» para intentar otra vez.", "error");
+      }
       return;
     }
 
-    const message = profileCheckFailed
-      ? "No pudimos confirmar si tu cuenta se creó. No uses otro código ni vuelvas a registrarte todavía; intentá ingresar con el mismo correo más tarde o consultá al personal."
-      : error.code === "auth/email-already-in-use"
+    if (profileCheckFailed) {
+      await signOut(auth).catch(() => {});
+      showSignedOut("No pudimos confirmar si tu cuenta se creó. No uses otro código ni vuelvas a registrarte todavía; intentá ingresar con el mismo correo más tarde o consultá al personal.", "error");
+      return;
+    }
+
+    const message = error.code === "auth/email-already-in-use"
         ? "Ese correo ya tiene una cuenta. Probá ingresar."
         : error.code === "auth/invalid-email"
           ? "Ingresá una dirección de correo válida."
