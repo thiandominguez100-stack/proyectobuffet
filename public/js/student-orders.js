@@ -244,6 +244,25 @@ function getStudentCalendarQuery() {
   );
 }
 
+function refreshServiceDateIfNeeded(user, token) {
+  const previousServiceDate = serviceDateNumber;
+  prepareServiceDate(schoolDayEntries);
+  if (previousServiceDate === serviceDateNumber) return false;
+
+  if (stopDailyTotal) stopDailyTotal();
+  if (stopAvailability) stopAvailability();
+  stopDailyTotal = null;
+  stopAvailability = null;
+  dailyQuantity = 0;
+  availabilityConfigured = false;
+  availabilityRemaining = { bizcochos: 0, facturas: 0 };
+  publishAvailabilityState();
+  listenForDailyTotal(user, token);
+  listenForDailyAvailability(token);
+  updateDailyCounter();
+  return true;
+}
+
 function listenForDailyAvailability(token) {
   if (stopAvailability) stopAvailability();
   const availabilityRef = doc(db, "dailyAvailability", String(serviceDateNumber));
@@ -378,6 +397,10 @@ checkoutButton.addEventListener("click", () => {
     return;
   }
   if (countCartUnits(currentCart) < 1) return;
+  if (refreshServiceDateIfNeeded(auth.currentUser, authLoadToken)) {
+    setCheckoutFeedback("Cambió la próxima jornada. Estamos actualizando el stock y el límite diario; volvé a abrir el pedido en un momento.", "error");
+    return;
+  }
   if (!catalogConfigured) {
     setCheckoutFeedback("El catálogo todavía no fue configurado por administración.", "error");
     return;
@@ -404,6 +427,11 @@ checkoutForm.addEventListener("submit", async (event) => {
   const user = auth.currentUser;
   if (!user || !user.emailVerified || !studentProfile) {
     setCheckoutFeedback("Tu sesión no está validada. Iniciá sesión nuevamente.", "error");
+    return;
+  }
+  if (refreshServiceDateIfNeeded(user, authLoadToken)) {
+    checkoutDialog.close();
+    setCheckoutFeedback("Cambió la próxima jornada. Estamos actualizando el stock y el límite diario; volvé a intentar en un momento.", "error");
     return;
   }
   if (!isOrderWindowOpen()) {
