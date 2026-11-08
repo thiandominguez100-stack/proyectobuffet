@@ -1,4 +1,4 @@
-if (location.hostname.endsWith(".github.io")) {
+if (location.hostname !== "buffet411-f80af.web.app") {
   // GitHub Pages shows the layout only; staff credentials and Firestore remain untouched.
   const authPanel = document.querySelector("#staff-auth");
   const dashboard = document.querySelector("#staff-dashboard");
