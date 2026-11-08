@@ -31,7 +31,6 @@ if (location.hostname.endsWith(".github.io")) {
     getDoc,
     serverTimestamp,
     runTransaction,
-    setDoc,
     updateDoc,
     writeBatch
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
@@ -256,6 +255,7 @@ registerForm.addEventListener("submit", async (event) => {
   submit.disabled = true;
   showFeedback("Creando tu cuenta…");
   let newUser = null;
+  let profileCreated = false;
   try {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     newUser = credential.user;
@@ -285,6 +285,7 @@ registerForm.addEventListener("submit", async (event) => {
         updatedAt: serverTimestamp()
       });
     });
+    profileCreated = true;
     showVerificationPanel();
     try {
       await sendEmailVerification(newUser);
@@ -295,7 +296,26 @@ registerForm.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     console.error("No se pudo crear la cuenta:", error);
-    if (newUser) await deleteUser(newUser).catch(() => {});
+    if (newUser && !profileCreated) {
+      try {
+        const savedProfile = await getDoc(doc(db, "users", newUser.uid));
+        profileCreated = savedProfile.exists();
+      } catch (readError) {
+        console.warn("No se pudo confirmar el resultado del canje del código:", readError);
+      }
+    }
+    if (newUser && !profileCreated) await deleteUser(newUser).catch(() => {});
+    if (profileCreated && newUser) {
+      showVerificationPanel();
+      try {
+        await sendEmailVerification(newUser);
+        showFeedback("La cuenta quedó creada. Te enviamos el correo de verificación.", "success");
+      } catch (mailError) {
+        console.error("No se pudo enviar el correo de verificación:", mailError);
+        showFeedback("La cuenta quedó creada, pero no pudimos enviar el correo. Tocá «Reenviar correo».", "error");
+      }
+      return;
+    }
     const message = error.code === "auth/email-already-in-use"
       ? "Ese correo ya tiene una cuenta. Probá ingresar."
       : error.code === "auth/invalid-email"
