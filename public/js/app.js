@@ -62,7 +62,7 @@ import {
   var feedback = document.querySelector("[data-cart-feedback]");
   var checkoutButton = document.querySelector("#checkout-open");
   var bookedQuantity = 0;
-  var previewOnly = window.location.hostname !== "buffet411-f80af.web.app";
+  var previewOnly = window.location.hostname !== "buffet411-f80af.web.app" && !["localhost", "127.0.0.1"].includes(window.location.hostname);
   var catalogConfigured = previewOnly;
   var stockConfigured = previewOnly;
   var catalogPrices = { bizcochos: PRODUCTS.bizcochos.price, facturas: PRODUCTS.facturas.price };
