@@ -4,7 +4,9 @@ import { readFile } from "node:fs/promises";
 import {
   ENROLLMENT_CODE_LENGTH,
   generateEnrollmentCode,
+  generateEnrollmentCodes,
   isValidEnrollmentCode,
+  MAX_ENROLLMENT_BATCH_SIZE,
   normalizeEnrollmentCode
 } from "../public/js/enrollment.js";
 
@@ -42,6 +44,28 @@ test("la generación usa crypto.getRandomValues y nunca Math.random", () => {
   assert.throws(() => generateEnrollmentCode(null), /códigos seguros/);
 });
 
+test("los lotes generan códigos únicos y respetan el máximo de 300", () => {
+  let sequence = 0;
+  const fakeCrypto = {
+    getRandomValues(bytes) {
+      bytes.fill(sequence++);
+      return bytes;
+    }
+  };
+  const codes = generateEnrollmentCodes(25, fakeCrypto);
+  assert.equal(codes.length, 25);
+  assert.equal(new Set(codes).size, 25);
+  assert.ok(codes.every(isValidEnrollmentCode));
+  assert.equal(MAX_ENROLLMENT_BATCH_SIZE, 300);
+  assert.throws(() => generateEnrollmentCodes(0), RangeError);
+  assert.throws(() => generateEnrollmentCodes(301), RangeError);
+});
+
+test("la generación de lotes termina con error si el generador repite códigos", () => {
+  const repeatedCrypto = { getRandomValues(bytes) { bytes.fill(31); return bytes; } };
+  assert.throws(() => generateEnrollmentCodes(2, repeatedCrypto), /códigos únicos/);
+});
+
 test("el registro consume el código y crea el perfil en una sola transacción", () => {
   assert.match(auth, /runTransaction\(db/);
   assert.match(auth, /transaction\.get\(codeRef\)/);
@@ -74,6 +98,9 @@ test("el panel muestra herramientas de inscripción solo a administración", () 
   assert.match(staff, /startEnrollmentCodeManager\(user\)/);
   assert.match(staffHtml, /id="staff-enrollment-tools" hidden/);
   assert.match(staffHtml, /id="staff-enrollment-create"/);
+  assert.match(staffHtml, /id="staff-enrollment-quantity"/);
+  assert.match(staff, /generateEnrollmentCodes\(requestedCount\)/);
+  assert.match(staff, /downloadEnrollmentCodesCsv\(savedCodes\)/);
 });
 
 test("personal operativo no puede enumerar perfiles ni contadores privados", () => {
