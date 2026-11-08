@@ -36,7 +36,7 @@ if (location.hostname.endsWith(".github.io")) {
     writeBatch
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
 
-import { hashEnrollmentCode } from "./enrollment-codes.js";
+const { hashEnrollmentCode } = await import("./enrollment-codes.js");
 
 const $ = (selector) => document.querySelector(selector);
 const authGate = $("#student-auth-gate");
