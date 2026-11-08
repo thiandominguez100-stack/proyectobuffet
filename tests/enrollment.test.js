@@ -77,6 +77,13 @@ test("el registro consume el código y crea el perfil en una sola transacción",
   assert.doesNotMatch(auth, /student-register-course|student-register-division/);
 });
 
+test("el registro no ofrece controles para declarar curso o división", async () => {
+  const studentPage = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+  assert.doesNotMatch(studentPage, /id="student-register-course"/);
+  assert.doesNotMatch(studentPage, /id="student-register-division"/);
+  assert.match(studentPage, /según el código de inscripción/);
+});
+
 test("el panel administrativo asocia curso y división al emitir códigos", () => {
   assert.match(staffHtml, /id="staff-enrollment-course"/);
   assert.match(staffHtml, /id="staff-enrollment-division"/);
