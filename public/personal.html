@@ -64,29 +64,29 @@
     </aside>
 
     <section class="staff-main">
-      <div class="staff-heading" id="resumen"><div><span class="eyebrow">PANEL OPERATIVO</span><h2>Resumen de producción</h2><p>Vista inicial del área de personal.</p></div><span class="prototype-badge"><i></i> PROTOTIPO</span></div>
+      <div class="staff-heading" id="resumen"><div><span class="eyebrow">PANEL OPERATIVO</span><h2>Resumen de producción</h2><p>Pedidos del próximo día hábil, en tiempo real.</p></div><span class="prototype-badge"><i></i> PEDIDOS EN VIVO</span></div>
 
-      <div class="security-notice"><span class="notice-icon">!</span><div><strong>Panel de demostración</strong><p>El acceso del personal ya está protegido. Las funciones de pedidos, producción y pagos todavía no están conectadas a datos reales.</p></div></div>
+      <div class="security-notice"><span class="notice-icon">i</span><div><strong>Pedidos conectados</strong><p>Los pedidos y sus estados se actualizan desde Firestore. La administración de stock y calendario se incorporará en la siguiente etapa.</p></div></div>
 
       <div class="staff-stats">
-        <article class="stat-card"><span>PRÓXIMA JORNADA</span><strong>—</strong><small>Se calculará con el calendario escolar</small></article>
-        <article class="stat-card"><span>PEDIDOS RECIBIDOS</span><strong>—</strong><small>Datos disponibles al conectar Firestore</small></article>
-        <article class="stat-card"><span>BIZCOCHOS</span><strong>—</strong><small>Total para preparar o comprar</small></article>
-        <article class="stat-card"><span>FACTURAS</span><strong>—</strong><small>Total para preparar o comprar</small></article>
+        <article class="stat-card"><span>PRÓXIMA JORNADA</span><strong id="staff-next-date">—</strong><small>Próximo día hábil</small></article>
+        <article class="stat-card"><span>PEDIDOS RECIBIDOS</span><strong id="staff-orders-count">0</strong><small>Pedidos para preparar</small></article>
+        <article class="stat-card"><span>BIZCOCHOS</span><strong id="staff-bizcochos-total">0</strong><small>Unidades no canceladas</small></article>
+        <article class="stat-card"><span>FACTURAS</span><strong id="staff-facturas-total">0</strong><small>Unidades no canceladas</small></article>
       </div>
 
       <section class="staff-card" id="produccion">
-        <div class="card-heading"><div><span class="eyebrow">PRODUCCIÓN</span><h3>Totales por horario de retiro</h3></div><span class="muted-label">SIN DATOS TODAVÍA</span></div>
+        <div class="card-heading"><div><span class="eyebrow">PRODUCCIÓN</span><h3>Totales por horario de retiro</h3></div><span class="muted-label" id="staff-production-label">ACTUALIZACIÓN EN VIVO</span></div>
         <div class="production-table">
           <div class="production-row production-head"><span>HORARIO</span><span>BIZCOCHOS</span><span>FACTURAS</span></div>
-          <div class="production-row"><strong>08:50 — 09:00</strong><span>—</span><span>—</span></div>
-          <div class="production-row"><strong>10:20 — 10:30</strong><span>—</span><span>—</span></div>
+          <div class="production-row"><strong>08:50 — 09:00</strong><span id="staff-first-bizcochos">0</span><span id="staff-first-facturas">0</span></div>
+          <div class="production-row"><strong>10:20 — 10:30</strong><span id="staff-last-bizcochos">0</span><span id="staff-last-facturas">0</span></div>
         </div>
-        <p class="table-footnote">Los totales se calcularán a partir de pedidos confirmados para la próxima jornada habilitada.</p>
+        <p class="table-footnote">Se excluyen pedidos cancelados. Los totales incluyen todos los encargos de la jornada.</p>
       </section>
 
       <div class="staff-two-col">
-        <section class="staff-card" id="pedidos"><div class="card-heading"><div><span class="eyebrow">ORGANIZACIÓN</span><h3>Pedidos por curso</h3></div></div><div class="empty-state"><span>≡</span><strong>La lista aparecerá acá</strong><p>Se agruparán los encargos por curso y división.</p></div></section>
+        <section class="staff-card" id="pedidos"><div class="card-heading"><div><span class="eyebrow">ORGANIZACIÓN</span><h3>Pedidos individuales</h3></div><span class="muted-label" id="staff-orders-status">CARGANDO</span></div><div class="staff-orders-list" id="staff-orders-list"><div class="empty-state"><span>≡</span><strong>Consultando pedidos…</strong><p>Los pedidos confirmados aparecerán acá.</p></div></div></section>
         <section class="staff-card" id="productos"><div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y stock</h3></div></div><div class="mini-product"><span class="mini-product-mark">B</span><span><strong>Bizcochos</strong><small>Precio inicial: $500</small></span><span class="muted-label">Pendiente</span></div><div class="mini-product"><span class="mini-product-mark">F</span><span><strong>Facturas</strong><small>Precio inicial: $1.000</small></span><span class="muted-label">Pendiente</span></div></section>
       </div>
 
@@ -94,9 +94,9 @@
         <section class="staff-card" id="calendario"><div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div><div class="empty-state compact"><span>▦</span><strong>Calendario editable</strong><p>Se podrán marcar feriados, vacaciones y días sin clases.</p></div></section>
         <section class="staff-card" id="pagos"><div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div><div class="empty-state compact"><span>$</span><strong>Verificación manual</strong><p>El personal podrá confirmar efectivo o Mercado Pago.</p></div></section>
       </div>
-      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Acceso verificado. Las funciones operativas se incorporarán en próximas etapas.</span></div>
+      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos se guardan en Firebase. El stock y el calendario aún no están conectados.</span></div>
     </section>
   </main>
-  <footer class="site-footer wrap"><span>Buffet 411 · Panel interno</span><span class="footer-status"><i></i> Prototipo visual</span></footer>
+  <footer class="site-footer wrap"><span>Buffet 411 · Panel interno</span><span class="footer-status"><i></i> Pedidos conectados</span></footer>
 </body>
 </html>
