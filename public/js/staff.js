@@ -83,7 +83,7 @@ function showAuthorizedStep(user, role) {
   authPanel.hidden = false;
   form.hidden = true;
   authorizedStep.hidden = false;
-  showMessage("Acceso autorizado. Tu cuenta está verificada.", "success");
+  showMessage("Permisos confirmados. Tu cuenta está autorizada para el área de personal.", "success");
 }
 
 async function checkStaffRole(user) {
