@@ -4,7 +4,7 @@ if (location.hostname.endsWith(".github.io")) {
   const dashboard = document.querySelector("#staff-dashboard");
   if (authPanel) authPanel.hidden = true;
   if (dashboard) dashboard.hidden = false;
-else {
+} else {
   const { auth, db } = await import("./firebase.js");
   const {
     onAuthStateChanged,
