@@ -45,6 +45,7 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 ## Cuentas y perfiles de alumnos
 
 - Registro e inicio de sesión con Firebase Authentication (correo y contraseña).
+- El registro requiere un código de inscripción individual de un solo uso, emitido desde el panel por una cuenta administradora. El código se consume en la misma transacción que crea el perfil.
 - Verificación obligatoria del correo antes de entrar al catálogo.
 - Perfil de Firestore con nombre para mostrar, curso y división; el correo queda únicamente en Firebase Authentication.
 - El alumno solo puede cambiar su nombre para mostrar; curso, división, rol y estado quedan protegidos.
@@ -58,6 +59,8 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 - No abrir el servicio a estudiantes reales hasta que la escuela autorice el tratamiento de datos y se termine la validación de reglas.
 
 ## Estado actual
+
+Se está preparando en la rama `security/audit-and-enrollment-codes` una revisión de seguridad que incorpora códigos de inscripción de un solo uso, limita la lectura de perfiles y contadores a los roles que los necesitan, y agrega pruebas del flujo de inscripción. Esta rama no se ha publicado en Firebase Hosting ni en Firestore; requiere validación de CI/emulador y revisión funcional antes de integrarse.
 
 El proyecto Firebase `buffet411-f80af` tiene Hosting y Authentication activos. El usuario confirmó manualmente en Firebase Hosting el flujo principal: los alumnos pueden crear pedidos, el personal los recibe en vivo, puede actualizar su estado y marcar pagos, y el alumno puede consultar sus pedidos. El acceso de alumnos, el catálogo y la gestión básica de pedidos fueron comprobados manualmente.
 
