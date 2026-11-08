@@ -9,7 +9,106 @@ service cloud.firestore {
     function isStaff() {
       return signedIn()
         && exists(/databases/$(database)/documents/staffRoles/$(request.auth.uid))
-        && (get(/databases/$(database)/documents/staffRoles/$(request.auth.uid)).data.role in ['staff', 'admin']);
+        && get(/databases/$(database)/documents/staffRoles/$(request.auth.uid)).data.role in ['staff', 'admin'];
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/staffRoles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/staffRoles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function activeStudent(uid) {
+      return signedIn()
+        && request.auth.uid == uid
+        && request.auth.token.email_verified == true
+        && get(/databases/$(database)/documents/users/$(uid)).data.role == 'student'
+        && get(/databases/$(database)/documents/users/$(uid)).data.active == true;
+    }
+
+    function orderWindowOpen() {
+      // Argentina (UTC-3): 13:00 inclusive to before 17:00 is 16:00-20:00 UTC.
+      return request.time.dayOfWeek() < 6
+        && request.time.hours() >= 16
+        && request.time.hours() < 20;
+    }
+
+    function validNextSchoolDate(dateAt, dateNumber) {
+      let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dateNumber));
+      return dateAt is timestamp
+        && dateNumber is int
+        && dateAt.hours() == 3
+        && dateAt.minutes() == 0
+        && dateAt.seconds() == 0
+        && dateAt.nanos() == 0
+        && dateNumber == dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day()
+        && request.time.dayOfWeek() < 6
+        && (
+          (request.time.dayOfWeek() < 5
+            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
+          ||
+          (request.time.dayOfWeek() == 5
+            && dateAt.date() == request.time.date() + duration.value(3, 'd'))
+        )
+        && (!exists(schoolDayPath) || get(schoolDayPath).data.open == true);
+    }
+
+    function validOrderItems(data) {
+      return data.items is map
+        && data.items.keys().hasOnly(['bizcochos', 'facturas'])
+        && data.items.keys().hasAll(['bizcochos', 'facturas'])
+        && data.items.bizcochos is int
+        && data.items.facturas is int
+        && data.items.bizcochos >= 0
+        && data.items.facturas >= 0
+        && data.items.bizcochos <= 5
+        && data.items.facturas <= 5
+        && data.quantity is int
+        && data.quantity >= 1
+        && data.quantity <= 5
+        && data.quantity == data.items.bizcochos + data.items.facturas
+        && data.total is int
+        && data.total == data.items.bizcochos * 500 + data.items.facturas * 1000;
+    }
+
+    function hasAtomicDailyTotal(orderId, data) {
+      let totalPath = /databases/$(database)/documents/dailyOrderTotals/$(data.dailyTotalId);
+      let oldQuantity = exists(totalPath) ? get(totalPath).data.quantity : 0;
+      let oldOrderCount = exists(totalPath) ? get(totalPath).data.orderCount : 0;
+      let afterTotal = getAfter(totalPath).data;
+      return existsAfter(totalPath)
+        && data.dailyTotalId == data.uid + '_' + string(data.serviceDateNumber)
+        && afterTotal.uid == data.uid
+        && afterTotal.serviceDateNumber == data.serviceDateNumber
+        && afterTotal.quantity == oldQuantity + data.quantity
+        && afterTotal.quantity <= 5
+        && afterTotal.orderCount == oldOrderCount + 1
+        && afterTotal.latestOrderId == orderId
+        && afterTotal.updatedAt == request.time;
+    }
+
+    function dailyTotalMatchesNewOrder(uid, totalId, newTotal, oldQuantity, oldOrderCount) {
+      let orderPath = /databases/$(database)/documents/orders/$(newTotal.latestOrderId);
+      let order = getAfter(orderPath).data;
+      return existsAfter(orderPath)
+        && order.uid == uid
+        && order.dailyTotalId == totalId
+        && order.serviceDateNumber == newTotal.serviceDateNumber
+        && order.quantity == newTotal.quantity - oldQuantity
+        && order.createdAt == request.time
+        && newTotal.orderCount == oldOrderCount + 1
+        && newTotal.quantity <= 5
+        && newTotal.updatedAt == request.time;
+    }
+
+    function validStaffStatusChange() {
+      let oldStatus = resource.data.status;
+      let newStatus = request.resource.data.status;
+      return oldStatus == newStatus
+        || (oldStatus == 'pending' && newStatus in ['accepted', 'cancelled'])
+        || (oldStatus == 'accepted' && newStatus in ['preparing', 'cancelled'])
+        || (oldStatus == 'preparing' && newStatus == 'ready')
+        || (oldStatus == 'ready' && newStatus == 'delivered');
     }
 
     match /staffRoles/{uid} {
@@ -23,6 +122,7 @@ service cloud.firestore {
 
       allow create: if signedIn()
         && request.auth.uid == uid
+        && request.auth.token.email_verified == false
         && request.resource.data.keys().hasOnly([
           'uid', 'displayName', 'course', 'division',
           'role', 'active', 'createdAt', 'updatedAt'
@@ -71,6 +171,107 @@ service cloud.firestore {
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
+    match /schoolDays/{dateNumber} {
+      allow get, list: if signedIn();
+      allow create, update, delete: if isAdmin()
+        && request.resource.data.keys().hasOnly(['open', 'label', 'updatedAt'])
+        && request.resource.data.open is bool
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    match /orders/{orderId} {
+      allow get: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if activeStudent(request.auth.uid)
+        && orderWindowOpen()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'course', 'division', 'serviceDateAt',
+          'serviceDateNumber', 'dailyTotalId', 'items', 'quantity', 'total',
+          'pickupSlot', 'paymentMethod', 'paymentStatus', 'status', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'displayName', 'course', 'division', 'serviceDateAt',
+          'serviceDateNumber', 'dailyTotalId', 'items', 'quantity', 'total',
+          'pickupSlot', 'paymentMethod', 'paymentStatus', 'status', 'createdAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.displayName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName
+        && request.resource.data.course == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.course
+        && request.resource.data.division == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.division
+        && validNextSchoolDate(request.resource.data.serviceDateAt, request.resource.data.serviceDateNumber)
+        && request.resource.data.dailyTotalId == request.auth.uid + '_' + string(request.resource.data.serviceDateNumber)
+        && validOrderItems(request.resource.data)
+        && request.resource.data.pickupSlot in ['primer-recreo', 'ultimo-recreo']
+        && request.resource.data.paymentMethod in ['cash', 'mercadopago']
+        && (
+          (request.resource.data.paymentMethod == 'cash' && request.resource.data.paymentStatus == 'unpaid')
+          ||
+          (request.resource.data.paymentMethod == 'mercadopago' && request.resource.data.paymentStatus == 'pending_review')
+        )
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && hasAtomicDailyTotal(orderId, request.resource.data);
+
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentStatus', 'updatedAt'])
+        && request.resource.data.status in ['pending', 'accepted', 'preparing', 'ready', 'delivered', 'cancelled']
+        && request.resource.data.paymentStatus in ['unpaid', 'pending_review', 'paid']
+        && validStaffStatusChange()
+        && (resource.data.paymentStatus == request.resource.data.paymentStatus
+          || (resource.data.paymentStatus in ['unpaid', 'pending_review'] && request.resource.data.paymentStatus == 'paid'))
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    match /dailyOrderTotals/{totalId} {
+      allow get: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if activeStudent(request.auth.uid)
+        && orderWindowOpen()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'serviceDateNumber', 'quantity', 'orderCount', 'latestOrderId', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'serviceDateNumber', 'quantity', 'orderCount', 'latestOrderId', 'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && totalId == request.auth.uid + '_' + string(request.resource.data.serviceDateNumber)
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity >= 1
+        && request.resource.data.quantity <= 5
+        && request.resource.data.orderCount == 1
+        && request.resource.data.latestOrderId is string
+        && dailyTotalMatchesNewOrder(
+          request.auth.uid, totalId, request.resource.data, 0, 0
+        );
+
+      allow update: if activeStudent(request.auth.uid)
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'quantity', 'orderCount', 'latestOrderId', 'updatedAt'
+        ])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.serviceDateNumber == resource.data.serviceDateNumber
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity > resource.data.quantity
+        && request.resource.data.quantity <= 5
+        && request.resource.data.orderCount == resource.data.orderCount + 1
+        && request.resource.data.latestOrderId is string
+        && dailyTotalMatchesNewOrder(
+          request.auth.uid,
+          totalId,
+          request.resource.data,
+          resource.data.quantity,
+          resource.data.orderCount
+        );
+
+      allow delete: if false;
+    }
+
+    // Todas las colecciones no definidas arriba siguen cerradas.
     match /{document=**} {
       allow read, write: if false;
     }
