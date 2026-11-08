@@ -118,13 +118,16 @@ export function isOrderWindowOpen(date = new Date()) {
 }
 
 export function getNextSchoolDate(date = new Date(), options = {}) {
-  const { openDates = [], closedDates = [] } = options;
+  const { openDates = [], closedDates = [], maxDays = 370 } = options;
+  if (!Number.isSafeInteger(maxDays) || maxDays < 1 || maxDays > 370) {
+    throw new TypeError("El rango del calendario debe estar entre 1 y 370 días.");
+  }
   const current = getArgentinaDateParts(date);
   const candidate = new Date(Date.UTC(current.year, current.month - 1, current.day));
   const open = new Set(openDates);
   const closed = new Set(closedDates);
 
-  for (let offset = 1; offset <= 370; offset += 1) {
+  for (let offset = 1; offset <= maxDays; offset += 1) {
     candidate.setUTCDate(candidate.getUTCDate() + 1);
     const key = [
       candidate.getUTCFullYear(),
