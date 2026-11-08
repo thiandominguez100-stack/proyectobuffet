@@ -1,5 +1,5 @@
 "use strict";
-var CACHE_NAME = "buffet411-shell-v3";
+var CACHE_NAME = "buffet411-shell-v4";
 var APP_SHELL = [
   "/",
   "./index.html",
