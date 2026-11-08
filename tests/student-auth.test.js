@@ -60,7 +60,7 @@ test("un fallo temporal al validar el perfil no cierra automáticamente la sesi�
   const end = auth.indexOf("\ntabs.forEach", start);
   const loader = auth.slice(start, end);
   const catchBlock = loader.slice(loader.indexOf("} catch (error)"));
-  assert.doesNotMatch(catchBlock, /signOut\\(auth\\)/);
+  assert.doesNotMatch(catchBlock, /signOut\(auth\)/);
   assert.match(catchBlock, /Tu sesión sigue abierta/);
   assert.match(auth, /await loadStudentSession\(auth\.currentUser\)/);
 });
