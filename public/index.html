@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="./css/app.css">
   <script type="module" src="./js/app.js"></script>
   <script type="module" src="./js/student-auth.js"></script>
+  <script type="module" src="./js/student-orders.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -153,7 +154,7 @@
 
       <section class="cart-panel" id="carrito" aria-labelledby="cart-title">
         <div class="cart-heading">
-          <div><span class="eyebrow">TU ENCARGO</span><h3 id="cart-title">Carrito de prueba</h3><p>Hasta 5 productos en total por alumno y jornada.</p></div>
+          <div><span class="eyebrow">TU ENCARGO</span><h3 id="cart-title">Tu carrito</h3><p>Máximo 5 productos combinados por jornada.</p><p class="student-daily-usage" id="student-daily-usage">Ya encargaste 0 de 5 unidades para la próxima jornada.</p></div>
           <span class="cart-count"><strong data-cart-count>0</strong><small>/ 5 unidades</small></span>
         </div>
         <div class="cart-list" data-cart-list aria-live="polite">
@@ -161,11 +162,15 @@
         </div>
         <div class="cart-bottom">
           <div class="cart-total"><span>Total estimado</span><strong data-cart-total>$0</strong></div>
-          <button class="button button-disabled" type="button" disabled>Confirmar pedido · próximamente</button>
+          <button class="button button-primary" id="checkout-open" type="button" disabled>Confirmar pedido</button>
         </div>
-        <p class="cart-feedback" data-cart-feedback role="status" aria-live="polite">Este carrito es una demostración local. Todavía no guarda ni envía pedidos.</p>
+        <p class="cart-feedback" data-cart-feedback role="status" aria-live="polite">Agregá productos y confirmá tu pedido entre las 13:00 y las 17:00.</p>
       </section>
-      <p class="photo-note"><strong>Próxima mejora:</strong> reemplazaremos estos espacios por fotografías reales de los productos del buffet.</p>
+      <section class="student-orders-panel" id="mis-pedidos">
+        <div class="section-heading"><div><span class="eyebrow">SEGUIMIENTO</span><h2>Mis pedidos</h2><p>Consultá tus encargos y su estado.</p></div></div>
+        <div class="student-orders-list" id="student-orders-list" aria-live="polite"><p class="cart-empty">Cargando tus pedidos…</p></div>
+      </section>
+      <p class="photo-note">Los pedidos se guardan en Firebase y el personal puede verlos para organizar la próxima jornada.</p>
     </section>
 
     <section class="wrap section how-section" id="como-funciona">
@@ -183,6 +188,29 @@
     </section>
   </main>
 
+  <dialog class="student-checkout-dialog" id="student-checkout-dialog" aria-labelledby="checkout-title">
+    <form class="student-checkout-card" id="student-checkout-form">
+      <div class="student-profile-heading">
+        <div><span class="eyebrow">CONFIRMAR ENCARGO</span><h2 id="checkout-title">Tu pedido</h2></div>
+        <button class="icon-button" id="checkout-close" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <div class="checkout-date-box"><small>Jornada de retiro</small><strong id="checkout-service-date">Próxima jornada hábil</strong><span>Los pedidos corresponden al siguiente día hábil.</span></div>
+      <label for="checkout-pickup">Horario de retiro</label>
+      <select id="checkout-pickup" required>
+        <option value="primer-recreo">Primer recreo · 08:50–09:00</option>
+        <option value="ultimo-recreo">Último recreo · 10:20–10:30</option>
+      </select>
+      <label for="checkout-payment">Forma de pago</label>
+      <select id="checkout-payment" required>
+        <option value="cash">Efectivo al retirar</option>
+        <option value="mercadopago">Mercado Pago (confirmación manual)</option>
+      </select>
+      <div class="checkout-total"><span>Total del pedido</span><strong id="checkout-total">$0</strong></div>
+      <p class="student-form-note">Mercado Pago quedará pendiente hasta que el personal confirme el pago. No se solicita comprobante.</p>
+      <p class="student-auth-feedback" id="checkout-feedback" role="status" aria-live="polite"></p>
+      <button class="button button-primary" id="checkout-submit" type="submit">Enviar pedido</button>
+    </form>
+  </dialog>
   <footer class="site-footer wrap" id="student-footer" hidden><a class="brand footer-brand" href="./index.html"><span class="brand-mark">B<span>411</span></span><span class="brand-copy"><strong>Buffet 411</strong><small>Encargos escolares</small></span></a><span>Una experiencia más simple para organizar el buffet.</span><span class="footer-status"><i></i> Primera versión en preparación</span></footer>
   <dialog class="student-profile-dialog" id="student-profile-dialog" aria-labelledby="student-profile-title">
     <form class="student-profile-card" id="student-profile-form">
