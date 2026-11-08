@@ -405,8 +405,8 @@ if (enrollmentForm) {
     const division = $("#staff-enrollment-division").value.trim();
     const count = Number($("#staff-enrollment-count").value);
     if (!course || course.length > 12 || !division || division.length > 8 ||
-        !Number.isSafeInteger(count) || count < 1 || count > 30) {
-      enrollmentMessage.textContent = "Revisá el curso, la división y la cantidad (1 a 30).";
+        !Number.isSafeInteger(count) || count < 1 || count > 10) {
+      enrollmentMessage.textContent = "Revisá el curso, la división y la cantidad (1 a 10).";
       return;
     }
 
