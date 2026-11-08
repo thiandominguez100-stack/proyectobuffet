@@ -13,11 +13,13 @@ if (location.hostname !== "buffet411-f80af.web.app") {
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js");
   const {
     collection,
+    deleteDoc,
     doc,
     getDoc,
     onSnapshot,
     query,
     serverTimestamp,
+    setDoc,
     writeBatch,
     updateDoc,
     where
@@ -41,6 +43,9 @@ let currentAuthorizedUid = null;
 let currentAuthorizedRole = null;
 let stopOrdersListener = null;
 let stopEnrollmentCodesListener = null;
+let stopSchoolDaysListener = null;
+let schoolDayEntries = [];
+let activeStaffServiceDateNumber = null;
 let orderActionsBusy = new Set();
 const ORDERS_PAGE_SIZE = 25;
 let allOrders = [];
@@ -55,9 +60,14 @@ function showMessage(text, kind = "") {
 function stopStaffOrders() {
   if (stopOrdersListener) stopOrdersListener();
   if (stopEnrollmentCodesListener) stopEnrollmentCodesListener();
+  if (stopSchoolDaysListener) stopSchoolDaysListener();
   stopOrdersListener = null;
   stopEnrollmentCodesListener = null;
+  stopSchoolDaysListener = null;
+  schoolDayEntries = [];
+  activeStaffServiceDateNumber = null;
   $("#staff-enrollment-tools").hidden = true;
+  $("#staff-calendar-form").hidden = true;
   orderActionsBusy = new Set();
   allOrders = [];
   currentPage = 1;
@@ -491,6 +501,78 @@ function setOrdersConnectionState(state, title, description) {
   $("#staff-notice-text").textContent = description;
 }
 
+function calendarDateKey(value) {
+  const digits = String(value || "").replace(/\\D/g, "").padStart(8, "0");
+  if (digits.length !== 8) return "";
+  return digits.slice(0, 4) + "-" + digits.slice(4, 6) + "-" + digits.slice(6, 8);
+}
+
+function getCalendarOptions() {
+  return {
+    openDates: schoolDayEntries.filter((entry) => entry.open).map((entry) => calendarDateKey(entry.dateNumber)),
+    closedDates: schoolDayEntries.filter((entry) => !entry.open).map((entry) => calendarDateKey(entry.dateNumber))
+  };
+}
+
+function renderSchoolCalendar() {
+  const list = $("#staff-calendar-list");
+  if (!list) return;
+  list.replaceChildren();
+
+  const today = getDateNumber(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Cordoba",
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date()));
+  const upcoming = schoolDayEntries
+    .filter((entry) => Number(entry.dateNumber) >= today)
+    .sort((a, b) => Number(a.dateNumber) - Number(b.dateNumber));
+
+  if (!upcoming.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state compact";
+    empty.textContent = "No hay excepciones cargadas. Se usa el calendario habitual de lunes a viernes.";
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const entry of upcoming) {
+    const row = document.createElement("div");
+    row.className = "staff-calendar-row";
+    const details = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = dateLabel(calendarDateKey(entry.dateNumber));
+    const description = document.createElement("small");
+    description.textContent = (entry.open ? "Jornada habilitada" : "Sin clases")
+      + (entry.label ? " · " + entry.label : "");
+    details.append(title, description);
+    const state = document.createElement("span");
+    state.className = entry.open ? "staff-calendar-open" : "staff-calendar-closed";
+    state.textContent = entry.open ? "ABIERTA" : "CERRADA";
+    row.append(details, state);
+
+    if (currentAuthorizedRole === "admin") {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button button-quiet";
+      remove.textContent = "Quitar excepción";
+      remove.addEventListener("click", async () => {
+        if (!window.confirm("¿Quitar esta excepción y volver al calendario habitual?")) return;
+        remove.disabled = true;
+        try {
+          await deleteDoc(doc(db, "schoolDays", String(entry.dateNumber)));
+          $("#staff-calendar-feedback").textContent = "Se quitó la excepción del calendario.";
+        } catch (error) {
+          console.error("No se pudo quitar la excepción:", error);
+          $("#staff-calendar-feedback").textContent = "No se pudo modificar el calendario. Revisá tus permisos.";
+          remove.disabled = false;
+        }
+      });
+      row.appendChild(remove);
+    }
+    list.appendChild(row);
+  }
+}
+
 function startStaffOrders() {
   stopStaffOrders();
   setOrdersConnectionState(
@@ -498,49 +580,119 @@ function startStaffOrders() {
     "Comprobando conexión",
     "Estamos consultando Firestore para verificar el acceso a los pedidos."
   );
-  const dateKey = getNextSchoolDate(new Date());
-  const number = getDateNumber(dateKey);
-  $("#staff-next-date").textContent = dateLabel(dateKey);
   $("#staff-orders-status").textContent = "CARGANDO…";
+  $("#staff-calendar-form").hidden = currentAuthorizedRole !== "admin";
 
-  const ordersQuery = query(
-    collection(db, "orders"),
-    where("serviceDateNumber", "==", number)
-  );
-  stopOrdersListener = onSnapshot(ordersQuery, { includeMetadataChanges: true }, (snapshot) => {
-    if (snapshot.metadata.fromCache) {
-      setOrdersConnectionState(
-        "DATOS EN CACHÉ",
-        "Mostrando datos guardados",
-        "Todavía no se confirmó la conexión con Firestore. Los datos pueden estar desactualizados."
-      );
-    } else {
-      setOrdersConnectionState(
-        "PEDIDOS EN VIVO",
-        "Pedidos conectados",
-        "La conexión con Firestore está confirmada. Los pedidos y sus estados se actualizan en tiempo real. La administración de stock y calendario se incorporará en la siguiente etapa."
-      );
+  stopSchoolDaysListener = onSnapshot(collection(db, "schoolDays"), (calendarSnapshot) => {
+    schoolDayEntries = calendarSnapshot.docs.map((item) => ({
+      id: item.id,
+      ...item.data(),
+      dateNumber: Number(item.data().dateNumber || item.id)
+    }));
+    renderSchoolCalendar();
+
+    let dateKey;
+    try {
+      dateKey = getNextSchoolDate(new Date(), getCalendarOptions());
+    } catch (error) {
+      setOrdersConnectionState("ERROR DE CALENDARIO", "No encontramos una jornada", "Revisá las excepciones del calendario escolar.");
+      $("#staff-orders-status").textContent = "ERROR DE CALENDARIO";
+      return;
     }
-    allOrders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-    renderStaffOrders(allOrders);
-  }, (error) => {
-    console.error("No se pudieron cargar los pedidos del buffet:", error);
-    const permissionDenied = error.code === "permission-denied";
-    setOrdersConnectionState(
-      permissionDenied ? "SIN PERMISO" : "ERROR DE CONEXIÓN",
-      permissionDenied ? "Firestore rechazó el acceso" : "No se pudo conectar",
-      permissionDenied
-        ? "La cuenta inició sesión, pero las reglas de Firestore no permiten consultar los pedidos. Hay que revisar y publicar las reglas de pedidos."
-        : "No pudimos consultar los pedidos. Comprobá la conexión a internet e intentá nuevamente."
+
+    const number = getDateNumber(dateKey);
+    $("#staff-next-date").textContent = dateLabel(dateKey);
+    if (number === activeStaffServiceDateNumber && stopOrdersListener) return;
+    activeStaffServiceDateNumber = number;
+    if (stopOrdersListener) stopOrdersListener();
+
+    const ordersQuery = query(
+      collection(db, "orders"),
+      where("serviceDateNumber", "==", number)
     );
-    $("#staff-orders-status").textContent = permissionDenied
-      ? "ACCESO DENEGADO"
-      : "ERROR DE CONEXIÓN";
-    $("#staff-orders-list").textContent = permissionDenied
-      ? "La cuenta está autorizada para entrar, pero Firestore no permite leer los pedidos. Revisá las reglas."
-      : "No se pudieron consultar los pedidos. Revisá la conexión e intentá nuevamente.";
+    stopOrdersListener = onSnapshot(ordersQuery, { includeMetadataChanges: true }, (snapshot) => {
+      if (snapshot.metadata.fromCache) {
+        setOrdersConnectionState(
+          "DATOS EN CACHÉ",
+          "Mostrando datos guardados",
+          "Todavía no se confirmó la conexión con Firestore. Los datos pueden estar desactualizados."
+        );
+      } else {
+        setOrdersConnectionState(
+          "PEDIDOS EN VIVO",
+          "Pedidos conectados",
+          "La conexión con Firestore está confirmada. Los pedidos y sus estados se actualizan en tiempo real."
+        );
+      }
+      allOrders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      renderStaffOrders(allOrders);
+    }, (error) => {
+      console.error("No se pudieron cargar los pedidos del buffet:", error);
+      const permissionDenied = error.code === "permission-denied";
+      setOrdersConnectionState(
+        permissionDenied ? "SIN PERMISO" : "ERROR DE CONEXIÓN",
+        permissionDenied ? "Firestore rechazó el acceso" : "No se pudo conectar",
+        permissionDenied
+          ? "La cuenta inició sesión, pero Firestore no permite consultar los pedidos. Hay que revisar las reglas."
+          : "No pudimos consultar los pedidos. Comprobá la conexión a internet e intentá nuevamente."
+      );
+      $("#staff-orders-status").textContent = permissionDenied ? "ACCESO DENEGADO" : "ERROR DE CONEXIÓN";
+      $("#staff-orders-list").textContent = permissionDenied
+        ? "La cuenta está autorizada para entrar, pero Firestore no permite leer los pedidos. Revisá las reglas."
+        : "No se pudieron consultar los pedidos. Revisá la conexión e intentá nuevamente.";
+    });
+  }, (error) => {
+    console.error("No se pudo cargar el calendario escolar:", error);
+    setOrdersConnectionState(
+      error.code === "permission-denied" ? "SIN PERMISO" : "ERROR DE CALENDARIO",
+      "No se pudo consultar el calendario",
+      "Revisá la conexión y los permisos de lectura del calendario escolar."
+    );
+    $("#staff-orders-status").textContent = "ERROR DE CALENDARIO";
   });
 }
+
+$("#staff-calendar-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const feedback = $("#staff-calendar-feedback");
+  if (currentAuthorizedRole !== "admin" || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+    feedback.textContent = "Solo administración puede modificar el calendario.";
+    return;
+  }
+
+  const dateKey = $("#staff-calendar-date").value;
+  const label = $("#staff-calendar-label").value.trim();
+  const dateNumber = getDateNumber(dateKey);
+  const today = getDateNumber(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Cordoba",
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date()));
+  if (dateNumber <= today || label.length > 80) {
+    feedback.textContent = "Elegí una fecha futura y una descripción de hasta 80 caracteres.";
+    return;
+  }
+
+  const button = $("#staff-calendar-save");
+  button.disabled = true;
+  feedback.textContent = "Guardando excepción…";
+  try {
+    await setDoc(doc(db, "schoolDays", String(dateNumber)), {
+      dateNumber,
+      open: $("#staff-calendar-open").value === "true",
+      label,
+      updatedAt: serverTimestamp()
+    });
+    $("#staff-calendar-label").value = "";
+    feedback.textContent = "Calendario actualizado. La próxima jornada se recalculó automáticamente.";
+  } catch (error) {
+    console.error("No se pudo guardar el calendario:", error);
+    feedback.textContent = error.code === "permission-denied"
+      ? "Firebase rechazó el cambio. Confirmá que ingresaste con una cuenta administradora."
+      : "No se pudo guardar la fecha. Revisá la conexión e intentá nuevamente.";
+  } finally {
+    button.disabled = false;
+  }
+});
 
 
 $("#staff-orders-search").addEventListener("input", () => {
