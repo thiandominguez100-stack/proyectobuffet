@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --check public/js/app.js && node --check public/js/firebase.js && node --check public/js/domain.js && node --check public/js/enrollment.js && node --check public/js/student-auth.js && node --check public/js/student-orders.js && node --check public/js/staff.js && node --check public/sw.js && node --test tests/*.test.js",
+    "test": "node --check public/js/app.js && node --check public/js/firebase.js && node --check public/js/domain.js && node --check public/js/enrollment.js && node --check public/js/student-auth.js && node --check public/js/student-orders.js && node --check public/js/staff.js && node --check public/sw.js && node --test tests/app-shell.test.js tests/domain.test.js tests/enrollment.test.js tests/orders.test.js tests/staff-panel.test.js tests/student-auth.test.js",
     "test:rules": "node --test tests/firestore-rules.test.js"
   }
 }
