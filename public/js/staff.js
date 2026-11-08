@@ -19,9 +19,11 @@ if (location.hostname.endsWith(".github.io")) {
     query,
     serverTimestamp,
     updateDoc,
-    where
+    where,
+    writeBatch
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
   const { formatARS, getNextSchoolDate, getDateNumber } = await import("./domain.js");
+  const { generateEnrollmentCode, hashEnrollmentCode, formatEnrollmentCode } = await import("./enrollment-codes.js");
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#staff-login-form");
@@ -36,6 +38,7 @@ const enterPanelButton = $("#staff-enter-panel");
 const logoutButton = $("#staff-logout");
 
 let currentAuthorizedUid = null;
+let currentAuthorizedRole = null;
 let stopOrdersListener = null;
 let orderActionsBusy = new Set();
 const ORDERS_PAGE_SIZE = 25;
@@ -59,6 +62,11 @@ function stopStaffOrders() {
 function showLogin(text = "Solo pueden ingresar cuentas con rol de personal o administrador.", kind = "") {
   stopStaffOrders();
   currentAuthorizedUid = null;
+  currentAuthorizedRole = null;
+  const enrollmentAdmin = $("#staff-enrollment-admin");
+  const enrollmentNav = $("#staff-enrollment-nav");
+  if (enrollmentAdmin) enrollmentAdmin.hidden = true;
+  if (enrollmentNav) enrollmentNav.hidden = true;
   dashboard.hidden = true;
   authPanel.hidden = false;
   form.hidden = false;
@@ -67,9 +75,14 @@ function showLogin(text = "Solo pueden ingresar cuentas con rol de personal o ad
   showMessage(text, kind);
 }
 
-function showAuthorizedStep(user) {
+function showAuthorizedStep(user, role) {
   stopStaffOrders();
   currentAuthorizedUid = user.uid;
+  currentAuthorizedRole = role;
+  const enrollmentAdmin = $("#staff-enrollment-admin");
+  const enrollmentNav = $("#staff-enrollment-nav");
+  if (enrollmentAdmin) enrollmentAdmin.hidden = role !== "admin";
+  if (enrollmentNav) enrollmentNav.hidden = role !== "admin";
   dashboard.hidden = true;
   authPanel.hidden = false;
   form.hidden = true;
@@ -79,9 +92,9 @@ function showAuthorizedStep(user) {
 
 async function checkStaffRole(user) {
   const roleSnapshot = await getDoc(doc(db, "staffRoles", user.uid));
-  if (!roleSnapshot.exists()) return false;
+  if (!roleSnapshot.exists()) return null;
   const role = roleSnapshot.data().role;
-  return role === "staff" || role === "admin";
+  return role === "staff" || role === "admin" ? role : null;
 }
 
 function dateLabel(dateKey) {
@@ -376,6 +389,80 @@ $("#staff-orders-page-next").addEventListener("click", () => {
   renderStaffOrders(allOrders);
 });
 
+const enrollmentForm = $("#staff-enrollment-form");
+const enrollmentMessage = $("#staff-enrollment-message");
+const enrollmentOutput = $("#staff-enrollment-output");
+
+if (enrollmentForm) {
+  enrollmentForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (currentAuthorizedRole !== "admin" || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+      enrollmentMessage.textContent = "Solo una cuenta administradora puede generar códigos.";
+      return;
+    }
+
+    const course = $("#staff-enrollment-course").value.trim();
+    const division = $("#staff-enrollment-division").value.trim();
+    const count = Number($("#staff-enrollment-count").value);
+    if (!course || course.length > 12 || !division || division.length > 8 ||
+        !Number.isSafeInteger(count) || count < 1 || count > 30) {
+      enrollmentMessage.textContent = "Revisá el curso, la división y la cantidad (1 a 30).";
+      return;
+    }
+
+    const generateButton = $("#staff-enrollment-submit");
+    generateButton.disabled = true;
+    enrollmentMessage.textContent = "Generando códigos seguros…";
+    $("#staff-enrollment-results").hidden = true;
+
+    try {
+      const batch = writeBatch(db);
+      const generatedCodes = [];
+      const generatedHashes = new Set();
+
+      while (generatedCodes.length < count) {
+        const code = generateEnrollmentCode();
+        const codeHash = await hashEnrollmentCode(code);
+        if (generatedHashes.has(codeHash)) continue;
+        generatedHashes.add(codeHash);
+        batch.set(doc(db, "enrollmentCodes", codeHash), {
+          status: "available",
+          course,
+          division,
+          createdBy: currentAuthorizedUid,
+          createdAt: serverTimestamp()
+        });
+        generatedCodes.push(formatEnrollmentCode(code));
+      }
+
+      await batch.commit();
+      enrollmentOutput.value = generatedCodes.join("\\n");
+      $("#staff-enrollment-results").hidden = false;
+      enrollmentMessage.textContent = generatedCodes.length + " código(s) creado(s). Guardalos y entregalos individualmente.";
+    } catch (error) {
+      console.error("No se pudieron generar los códigos de inscripción:", error);
+      enrollmentMessage.textContent = error.code === "permission-denied"
+        ? "Firebase rechazó la operación. Se necesita una cuenta administradora y las reglas nuevas."
+        : "No se pudieron generar los códigos. No se guardó ningún lote; intentá nuevamente.";
+    } finally {
+      generateButton.disabled = false;
+    }
+  });
+}
+
+const enrollmentCopyButton = $("#staff-enrollment-copy");
+if (enrollmentCopyButton) {
+  enrollmentCopyButton.addEventListener("click", async () => {
+    if (!enrollmentOutput?.value) return;
+    try {
+      await navigator.clipboard.writeText(enrollmentOutput.value);
+      enrollmentMessage.textContent = "Códigos copiados. Guardalos en un lugar seguro.";
+    } catch (error) {
+      enrollmentMessage.textContent = "No se pudo acceder al portapapeles. Seleccioná el texto y copialo manualmente.";
+    }
+  });
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   submitButton.disabled = true;
@@ -386,13 +473,13 @@ form.addEventListener("submit", async (event) => {
       emailInput.value.trim(),
       passwordInput.value
     );
-    const authorized = await checkStaffRole(credential.user);
-    if (!authorized) {
+    const role = await checkStaffRole(credential.user);
+    if (!role) {
       await signOut(auth);
       showLogin("Esta cuenta no tiene permisos para acceder al panel.", "error");
       return;
     }
-    showAuthorizedStep(credential.user);
+    showAuthorizedStep(credential.user, role);
   } catch (error) {
     console.error("Error de acceso del personal:", error);
     const text = error.code === "auth/invalid-credential"
@@ -411,11 +498,17 @@ enterPanelButton.addEventListener("click", async () => {
   showMessage("Comprobando permisos nuevamente…");
   try {
     const user = auth.currentUser;
-    if (!user || user.uid !== currentAuthorizedUid || !(await checkStaffRole(user))) {
+    const role = user ? await checkStaffRole(user) : null;
+    if (!user || user.uid !== currentAuthorizedUid || !role) {
       await signOut(auth);
       showLogin("Tu autorización ya no está vigente. Iniciá sesión nuevamente.", "error");
       return;
     }
+    currentAuthorizedRole = role;
+    const enrollmentAdmin = $("#staff-enrollment-admin");
+    const enrollmentNav = $("#staff-enrollment-nav");
+    if (enrollmentAdmin) enrollmentAdmin.hidden = role !== "admin";
+    if (enrollmentNav) enrollmentNav.hidden = role !== "admin";
     authPanel.hidden = true;
     dashboard.hidden = false;
     startStaffOrders();
@@ -443,9 +536,9 @@ onAuthStateChanged(auth, async (user) => {
   authPanel.hidden = false;
 
   try {
-    const authorized = await checkStaffRole(user);
-    if (authorized) {
-      showAuthorizedStep(user);
+    const role = await checkStaffRole(user);
+    if (role) {
+      showAuthorizedStep(user, role);
     } else {
       await signOut(auth);
       showLogin("Esta cuenta no tiene permisos para acceder al panel.", "error");
