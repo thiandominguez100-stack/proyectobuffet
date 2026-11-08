@@ -152,7 +152,8 @@ function downloadEnrollmentCodesCsv(codes) {
   if (!Array.isArray(codes) || !codes.length) {
     throw new Error("No hay códigos guardados para descargar.");
   }
-  const csv = "\uFEFFCódigo de inscripción\\r\\n" + codes.join("\\r\\n") + "\\r\\n";
+  const newline = String.fromCharCode(13, 10);
+  const csv = "\uFEFFCódigo de inscripción" + newline + codes.join(newline) + newline;
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
