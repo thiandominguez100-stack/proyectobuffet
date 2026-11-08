@@ -114,7 +114,31 @@
           </nav>
         </section>
       <div class="staff-two-col">
-        <section class="staff-card" id="productos"><div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y stock</h3></div></div><div class="mini-product"><span class="mini-product-mark">B</span><span><strong>Bizcochos</strong><small>Precio inicial: $500</small></span><span class="muted-label">Pendiente</span></div><div class="mini-product"><span class="mini-product-mark">F</span><span><strong>Facturas</strong><small>Precio inicial: $1.000</small></span><span class="muted-label">Pendiente</span></div></section>
+        <section class="staff-card" id="productos">
+          <div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y stock</h3></div><span class="muted-label" id="staff-catalog-state">CONFIGURACIÓN PENDIENTE</span></div>
+          <form id="staff-catalog-form" class="staff-catalog-form" hidden>
+            <div class="staff-catalog-product">
+              <strong>Bizcochos</strong>
+              <label>Precio por unidad ($)<input id="staff-price-bizcochos" type="number" min="1" max="100000" step="1" required></label>
+              <label class="staff-check-label"><input id="staff-active-bizcochos" type="checkbox" checked> Disponible en catálogo</label>
+            </div>
+            <div class="staff-catalog-product">
+              <strong>Facturas</strong>
+              <label>Precio por unidad ($)<input id="staff-price-facturas" type="number" min="1" max="100000" step="1" required></label>
+              <label class="staff-check-label"><input id="staff-active-facturas" type="checkbox" checked> Disponible en catálogo</label>
+            </div>
+            <button class="button button-primary" id="staff-catalog-save" type="submit">Guardar precios y catálogo</button>
+          </form>
+          <p class="staff-auth-message" id="staff-catalog-feedback" role="status" aria-live="polite">Consultando el catálogo…</p>
+          <div class="staff-stock-heading"><strong>Stock de la próxima jornada</strong><span id="staff-stock-date">—</span></div>
+          <form id="staff-stock-form" class="staff-stock-form" hidden>
+            <label>Bizcochos disponibles<input id="staff-stock-bizcochos" type="number" min="0" max="5000" step="1" required></label>
+            <label>Facturas disponibles<input id="staff-stock-facturas" type="number" min="0" max="5000" step="1" required></label>
+            <button class="button button-primary" id="staff-stock-save" type="submit">Guardar stock diario</button>
+          </form>
+          <p class="table-footnote">El stock se descuenta automáticamente al confirmar un pedido y vuelve a estar disponible si el personal lo cancela. Los valores mostrados son las unidades que aún quedan para encargar.</p>
+          <p class="staff-auth-message" id="staff-stock-feedback" role="status" aria-live="polite"></p>
+        </section>
       </div>
 
       <div class="staff-two-col">
