@@ -33,6 +33,6 @@ test("formatea y calcula un hash SHA-256 estable sin almacenar el código origin
   const second = await hashEnrollmentCode("abcd-efgh-jkmn-pqrs");
   assert.match(first, /^[a-f0-9]{64}$/);
   assert.equal(first, second);
-  assert.notEqual(first, await hashEnrollmentCode("ABCD-EFGH-JKMN-PQRST"));
+  assert.notEqual(first, await hashEnrollmentCode("ABCD-EFGH-JKMN-PQRT"));
   assert.equal(formatEnrollmentCode("abcd-efgh-jkmn-pqrs"), "ABCD-EFGH-JKMN-PQRS");
 });
