@@ -9,30 +9,28 @@ if (location.hostname.endsWith(".github.io")) {
   }
   if (feedback) feedback.textContent = "Vista de demostración: el carrito es local y no se guardan pedidos.";
   if (orders) orders.textContent = "El historial estará disponible en la versión operativa.";
-} else {
-import { auth, db } from "./firebase.js";
-import {
-  onIdTokenChanged
-} from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
-import {
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
-  query,
-  runTransaction,
-  serverTimestamp,
-  where
-} from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import {
-  calculateCartTotal,
-  countCartUnits,
-  formatARS,
-  getArgentinaMidnightTimestamp,
-  getDateNumber,
-  getNextSchoolDate,
-  isOrderWindowOpen
-} from "./domain.js";
+else {
+  const { auth, db } = await import("./firebase.js");
+  const { onIdTokenChanged } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js");
+  const {
+    collection,
+    doc,
+    getDoc,
+    onSnapshot,
+    query,
+    runTransaction,
+    serverTimestamp,
+    where
+  } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
+  const {
+    calculateCartTotal,
+    countCartUnits,
+    formatARS,
+    getArgentinaMidnightTimestamp,
+    getDateNumber,
+    getNextSchoolDate,
+    isOrderWindowOpen
+  } = await import("./domain.js");
 
 const $ = (selector) => document.querySelector(selector);
 const checkoutButton = $("#checkout-open");
