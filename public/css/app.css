@@ -155,3 +155,8 @@
   .staff-order-action{flex:1 1 auto}
   .student-checkout-card{padding:19px}
 }
+
+/* Aviso de entorno: GitHub Pages es solo muestra visual, Firebase Hosting es operativo. */
+.preview-banner{position:relative;z-index:1;margin-top:18px;margin-bottom:10px;padding:14px 16px;border:1px solid var(--line);border-left:3px solid var(--blue);background:var(--surface);color:var(--text)}
+.preview-banner strong{font-size:12px}
+.preview-banner p{margin:5px 0 0;color:var(--muted);font-size:10px;line-height:1.6}
