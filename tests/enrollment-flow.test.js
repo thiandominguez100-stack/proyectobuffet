@@ -27,8 +27,8 @@ test("el cliente canjea el código y crea el perfil en una sola transacción", (
 test("las reglas vinculan el perfil nuevo a un código disponible y lo marcan como usado atómicamente", () => {
   assert.match(rules, /profileHasValidEnrollmentCode/);
   assert.match(rules, /codeRedemptionMatchesProfile/);
-  assert.match(rules, /getAfter\\(codePath\\)\\.data\\.status == 'redeemed'/);
-  assert.match(rules, /getAfter\\(codePath\\)\\.data\\.redeemedBy == uid/);
+  assert.match(rules, /getAfter\(codePath\)\.data\\.status == 'redeemed'/);
+  assert.match(rules, /getAfter\(codePath\)\.data\\.redeemedBy == uid/);
   assert.match(rules, /match \/enrollmentCodes\/\{codeHash\}/);
   assert.match(rules, /allow list: if isAdmin\(\);/);
   assert.match(rules, /allow delete: if false;/);
