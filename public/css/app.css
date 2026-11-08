@@ -184,3 +184,9 @@
 .staff-enrollment-row code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:15px;font-weight:800;letter-spacing:.12em;color:var(--text);margin-right:auto;overflow-wrap:anywhere}
 .staff-enrollment-row .button{min-height:36px;padding-inline:12px}
 @media(max-width:560px){.staff-enrollment-row{align-items:stretch}.staff-enrollment-row code{width:100%;margin:0}.staff-enrollment-row .button{flex:1}}
+
+.staff-enrollment-controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:14px 0}
+.staff-enrollment-count{display:grid;gap:6px;min-width:200px;max-width:260px;color:var(--text);font-weight:650}
+.staff-enrollment-count input{width:100%;min-height:42px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);font:inherit}
+.staff-enrollment-count input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+@media(max-width:560px){.staff-enrollment-controls{align-items:stretch;flex-direction:column}.staff-enrollment-count{max-width:none}.staff-enrollment-controls>.button{width:100%}}
