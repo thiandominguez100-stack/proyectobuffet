@@ -62,3 +62,17 @@ test("Firebase Hosting publica cabeceras HTTP de seguridad", () => {
   assert.match(value("Permissions-Policy"), /camera=\(\)/);
   assert.match(value("Strict-Transport-Security"), /max-age=31536000/);
 });
+
+
+test("localhost se conecta únicamente a emuladores y no al proyecto de producción", async () => {
+  const firebase = await readFile(new URL("../public/js/firebase.js", import.meta.url), "utf8");
+  const staff = await readFile(new URL("../public/js/staff.js", import.meta.url), "utf8");
+  const auth = await readFile(new URL("../public/js/student-auth.js", import.meta.url), "utf8");
+  const orders = await readFile(new URL("../public/js/student-orders.js", import.meta.url), "utf8");
+  assert.match(firebase, /projectId: "demo-buffet411-local"/);
+  assert.match(firebase, /connectAuthEmulator\(auth, "http:\/\/127\.0\.0\.1:9099"/);
+  assert.match(firebase, /connectFirestoreEmulator\(db, "127\.0\.0\.1", 8080\)/);
+  assert.match(staff, /location\.hostname !== "buffet411-f80af\.web\.app" && !isLocalEmulator/);
+  assert.match(auth, /location\.hostname !== "buffet411-f80af\.web\.app" && !isLocalEmulator/);
+  assert.match(orders, /location\.hostname !== "buffet411-f80af\.web\.app" && !isLocalEmulator/);
+});
