@@ -1,4 +1,5 @@
-if (location.hostname !== "buffet411-f80af.web.app") {
+const isLocalEmulator = ["localhost", "127.0.0.1"].includes(location.hostname);
+if (location.hostname !== "buffet411-f80af.web.app" && !isLocalEmulator) {
   // GitHub Pages is only a static preview; never collect credentials or profile data here.
   const gate = document.querySelector("#student-auth-gate");
   const app = document.querySelector("#student-app");
