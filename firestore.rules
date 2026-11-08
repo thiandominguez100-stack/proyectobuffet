@@ -120,6 +120,405 @@ service cloud.firestore {
         || (oldStatus == 'ready' && newStatus == 'delivered');
     }
 
+    function codeRedemptionMatchesProfile(codeHash) {
+      let profilePath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let profile = getAfter(profilePath).data;
+      return existsAfter(profilePath)
+        && profile.uid == request.auth.uid
+        && profile.role == 'student'
+        && profile.enrollmentCodeHash == codeHash
+        && profile.course == resource.data.course
+        && profile.division == resource.data.division;
+    }
+
+    function profileHasValidEnrollmentCode(uid, profileData) {
+      let codePath = /databases/$(database)/documents/enrollmentCodes/$(profileData.enrollmentCodeHash);
+      let codeBefore = get(codePath).data;
+      let codeAfter = getAfter(codePath).data;
+      return profileData.enrollmentCodeHash is string
+        && profileData.enrollmentCodeHash.matches('^[a-f0-9]{64}
+
+    match /users/{uid} {
+      allow get: if (signedIn() && request.auth.uid == uid) || isStaff();
+      allow list: if isStaff();
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.auth.token.email_verified == false
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'course', 'division', 'enrollmentCodeHash',
+          'role', 'active', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'displayName', 'course', 'division', 'enrollmentCodeHash',
+          'role', 'active', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 32
+        && request.resource.data.course is string
+        && request.resource.data.course.size() >= 1
+        && request.resource.data.course.size() <= 12
+        && request.resource.data.division is string
+        && request.resource.data.division.size() >= 1
+        && request.resource.data.division.size() <= 8
+        && request.resource.data.role == 'student'
+        && request.resource.data.active == true
+        && profileHasValidEnrollmentCode(uid, request.resource.data)
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 32
+        && request.resource.data.updatedAt is timestamp;
+
+      allow delete: if false;
+    }
+
+    match /profilePhotos/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['photoData', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['photoData', 'updatedAt'])
+        && request.resource.data.photoData is string
+        && request.resource.data.photoData.size() <= 150000
+        && request.resource.data.photoData.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /schoolDays/{dateNumber} {
+      allow get, list: if signedIn();
+      allow create, update, delete: if isAdmin()
+        && request.resource.data.keys().hasOnly(['open', 'label', 'updatedAt'])
+        && request.resource.data.open is bool
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    match /orders/{orderId} {
+      allow get: if isStaff() || (signedIn() && (resource == null || resource.data.uid == request.auth.uid));
+      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if activeStudent(request.auth.uid)
+        && orderWindowOpen()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'course', 'division', 'serviceDateAt',
+          'serviceDateNumber', 'dailyTotalId', 'items', 'quantity', 'total',
+          'pickupSlot', 'paymentMethod', 'paymentStatus', 'status', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'displayName', 'course', 'division', 'serviceDateAt',
+          'serviceDateNumber', 'dailyTotalId', 'items', 'quantity', 'total',
+          'pickupSlot', 'paymentMethod', 'paymentStatus', 'status', 'createdAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.displayName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName
+        && request.resource.data.course == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.course
+        && request.resource.data.division == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.division
+        && validNextSchoolDate(request.resource.data.serviceDateAt, request.resource.data.serviceDateNumber)
+        && request.resource.data.dailyTotalId == request.auth.uid + '_' + string(request.resource.data.serviceDateNumber)
+        && validOrderItems(request.resource.data)
+        && request.resource.data.pickupSlot in ['primer-recreo', 'ultimo-recreo']
+        && request.resource.data.paymentMethod in ['cash', 'mercadopago']
+        && (
+          (request.resource.data.paymentMethod == 'cash' && request.resource.data.paymentStatus == 'unpaid')
+          ||
+          (request.resource.data.paymentMethod == 'mercadopago' && request.resource.data.paymentStatus == 'pending_review')
+        )
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && hasAtomicDailyTotal(orderId, request.resource.data);
+
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentStatus', 'updatedAt'])
+        && request.resource.data.status in ['pending', 'accepted', 'preparing', 'ready', 'delivered', 'cancelled']
+        && request.resource.data.paymentStatus in ['unpaid', 'pending_review', 'paid']
+        && validStaffStatusChange()
+        && (resource.data.paymentStatus == request.resource.data.paymentStatus
+          || (resource.data.paymentStatus in ['unpaid', 'pending_review'] && request.resource.data.paymentStatus == 'paid'))
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    match /dailyOrderTotals/{totalId} {
+      allow get: if isStaff() || (signedIn() && (resource == null || resource.data.uid == request.auth.uid));
+      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if activeStudent(request.auth.uid)
+        && orderWindowOpen()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'serviceDateNumber', 'quantity', 'orderCount', 'latestOrderId', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'serviceDateNumber', 'quantity', 'orderCount', 'latestOrderId', 'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && totalId == request.auth.uid + '_' + string(request.resource.data.serviceDateNumber)
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity >= 1
+        && request.resource.data.quantity <= 5
+        && request.resource.data.orderCount == 1
+        && request.resource.data.latestOrderId is string
+        && dailyTotalMatchesNewOrder(
+          request.auth.uid, totalId, request.resource.data, 0, 0
+        );
+
+      allow update: if activeStudent(request.auth.uid)
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'quantity', 'orderCount', 'latestOrderId', 'updatedAt'
+        ])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.serviceDateNumber == resource.data.serviceDateNumber
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity > resource.data.quantity
+        && request.resource.data.quantity <= 5
+        && request.resource.data.orderCount == resource.data.orderCount + 1
+        && request.resource.data.latestOrderId is string
+        && dailyTotalMatchesNewOrder(
+          request.auth.uid,
+          totalId,
+          request.resource.data,
+          resource.data.quantity,
+          resource.data.orderCount
+        );
+
+      allow delete: if false;
+    }
+
+    // Todas las colecciones no definidas arriba siguen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+})
+        && exists(codePath)
+        && codeBefore.status == 'available'
+        && codeBefore.course == profileData.course
+        && codeBefore.division == profileData.division
+        && existsAfter(codePath)
+        && codeAfter.status == 'redeemed'
+        && codeAfter.redeemedBy == uid
+        && codeAfter.redeemedAt == request.time;
+    }
+
+    match /enrollmentCodes/{codeHash} {
+      allow get: if isAdmin()
+        || (signedIn() && resource.data.status == 'available');
+      allow list: if isAdmin();
+
+      allow create: if isAdmin()
+        && codeHash.matches('^[a-f0-9]{64}
+
+    match /users/{uid} {
+      allow get: if (signedIn() && request.auth.uid == uid) || isStaff();
+      allow list: if isStaff();
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.auth.token.email_verified == false
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'course', 'division',
+          'role', 'active', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'displayName', 'course', 'division',
+          'role', 'active', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 32
+        && request.resource.data.course is string
+        && request.resource.data.course.size() >= 1
+        && request.resource.data.course.size() <= 12
+        && request.resource.data.division is string
+        && request.resource.data.division.size() >= 1
+        && request.resource.data.division.size() <= 8
+        && request.resource.data.role == 'student'
+        && request.resource.data.active == true
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 32
+        && request.resource.data.updatedAt is timestamp;
+
+      allow delete: if false;
+    }
+
+    match /profilePhotos/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['photoData', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['photoData', 'updatedAt'])
+        && request.resource.data.photoData is string
+        && request.resource.data.photoData.size() <= 150000
+        && request.resource.data.photoData.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /schoolDays/{dateNumber} {
+      allow get, list: if signedIn();
+      allow create, update, delete: if isAdmin()
+        && request.resource.data.keys().hasOnly(['open', 'label', 'updatedAt'])
+        && request.resource.data.open is bool
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    match /orders/{orderId} {
+      allow get: if isStaff() || (signedIn() && (resource == null || resource.data.uid == request.auth.uid));
+      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if activeStudent(request.auth.uid)
+        && orderWindowOpen()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'displayName', 'course', 'division', 'serviceDateAt',
+          'serviceDateNumber', 'dailyTotalId', 'items', 'quantity', 'total',
+          'pickupSlot', 'paymentMethod', 'paymentStatus', 'status', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'displayName', 'course', 'division', 'serviceDateAt',
+          'serviceDateNumber', 'dailyTotalId', 'items', 'quantity', 'total',
+          'pickupSlot', 'paymentMethod', 'paymentStatus', 'status', 'createdAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.displayName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.displayName
+        && request.resource.data.course == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.course
+        && request.resource.data.division == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.division
+        && validNextSchoolDate(request.resource.data.serviceDateAt, request.resource.data.serviceDateNumber)
+        && request.resource.data.dailyTotalId == request.auth.uid + '_' + string(request.resource.data.serviceDateNumber)
+        && validOrderItems(request.resource.data)
+        && request.resource.data.pickupSlot in ['primer-recreo', 'ultimo-recreo']
+        && request.resource.data.paymentMethod in ['cash', 'mercadopago']
+        && (
+          (request.resource.data.paymentMethod == 'cash' && request.resource.data.paymentStatus == 'unpaid')
+          ||
+          (request.resource.data.paymentMethod == 'mercadopago' && request.resource.data.paymentStatus == 'pending_review')
+        )
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && hasAtomicDailyTotal(orderId, request.resource.data);
+
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentStatus', 'updatedAt'])
+        && request.resource.data.status in ['pending', 'accepted', 'preparing', 'ready', 'delivered', 'cancelled']
+        && request.resource.data.paymentStatus in ['unpaid', 'pending_review', 'paid']
+        && validStaffStatusChange()
+        && (resource.data.paymentStatus == request.resource.data.paymentStatus
+          || (resource.data.paymentStatus in ['unpaid', 'pending_review'] && request.resource.data.paymentStatus == 'paid'))
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if false;
+    }
+
+    match /dailyOrderTotals/{totalId} {
+      allow get: if isStaff() || (signedIn() && (resource == null || resource.data.uid == request.auth.uid));
+      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+
+      allow create: if activeStudent(request.auth.uid)
+        && orderWindowOpen()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'serviceDateNumber', 'quantity', 'orderCount', 'latestOrderId', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'serviceDateNumber', 'quantity', 'orderCount', 'latestOrderId', 'updatedAt'
+        ])
+        && request.resource.data.uid == request.auth.uid
+        && totalId == request.auth.uid + '_' + string(request.resource.data.serviceDateNumber)
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity >= 1
+        && request.resource.data.quantity <= 5
+        && request.resource.data.orderCount == 1
+        && request.resource.data.latestOrderId is string
+        && dailyTotalMatchesNewOrder(
+          request.auth.uid, totalId, request.resource.data, 0, 0
+        );
+
+      allow update: if activeStudent(request.auth.uid)
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'quantity', 'orderCount', 'latestOrderId', 'updatedAt'
+        ])
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.serviceDateNumber == resource.data.serviceDateNumber
+        && request.resource.data.quantity is int
+        && request.resource.data.quantity > resource.data.quantity
+        && request.resource.data.quantity <= 5
+        && request.resource.data.orderCount == resource.data.orderCount + 1
+        && request.resource.data.latestOrderId is string
+        && dailyTotalMatchesNewOrder(
+          request.auth.uid,
+          totalId,
+          request.resource.data,
+          resource.data.quantity,
+          resource.data.orderCount
+        );
+
+      allow delete: if false;
+    }
+
+    // Todas las colecciones no definidas arriba siguen cerradas.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+})
+        && request.resource.data.keys().hasOnly([
+          'status', 'course', 'division', 'createdBy', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'status', 'course', 'division', 'createdBy', 'createdAt'
+        ])
+        && request.resource.data.status == 'available'
+        && request.resource.data.course is string
+        && request.resource.data.course.size() >= 1
+        && request.resource.data.course.size() <= 12
+        && request.resource.data.division is string
+        && request.resource.data.division.size() >= 1
+        && request.resource.data.division.size() <= 8
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if (
+        isAdmin()
+        && resource.data.status == 'available'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'revokedBy', 'revokedAt'
+        ])
+        && request.resource.data.status == 'revoked'
+        && request.resource.data.revokedBy == request.auth.uid
+        && request.resource.data.revokedAt == request.time
+      ) || (
+        signedIn()
+        && resource.data.status == 'available'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'redeemedBy', 'redeemedAt'
+        ])
+        && request.resource.data.status == 'redeemed'
+        && request.resource.data.redeemedBy == request.auth.uid
+        && request.resource.data.redeemedAt == request.time
+        && codeRedemptionMatchesProfile(codeHash)
+      );
+
+      allow delete: if false;
+    }
+
     match /staffRoles/{uid} {
       allow get: if signedIn() && request.auth.uid == uid;
       allow list, create, update, delete: if false;
