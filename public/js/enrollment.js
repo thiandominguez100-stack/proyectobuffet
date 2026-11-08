@@ -3,7 +3,7 @@ const ENROLLMENT_CODE_LENGTH = 16;
 const ENROLLMENT_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{16}$/;
 
 export function normalizeEnrollmentCode(value) {
-  return String(value ?? "").replace(/\\s+/g, "").toUpperCase();
+  return String(value ?? "").replace(/\s+/g, "").toUpperCase();
 }
 
 export function isValidEnrollmentCode(value) {
