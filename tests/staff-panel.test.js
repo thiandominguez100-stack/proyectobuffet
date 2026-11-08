@@ -57,7 +57,7 @@ test("el calendario permite cargar excepciones y distingue controles administrat
 
 
 test("el personal puede cargar stock y administración puede cambiar precios y activar productos", () => {
-  assert.match(page, /id="staff-catalog-form" hidden/);
+  assert.match(page, /<form id="staff-catalog-form"[^>]*hidden>/);
   assert.match(page, /id="staff-price-bizcochos"/);
   assert.match(page, /id="staff-price-facturas"/);
   assert.match(page, /id="staff-stock-form"/);
