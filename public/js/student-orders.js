@@ -23,7 +23,6 @@ if (location.hostname !== "buffet411-f80af.web.app") {
     where
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
   const {
-    calculateCartTotal,
     countCartUnits,
     formatARS,
     getArgentinaMidnightTimestamp,
@@ -48,7 +47,16 @@ let serviceDateNumber = 0;
 let stopDailyTotal = null;
 let stopOrders = null;
 let stopSchoolDays = null;
+let stopCatalog = null;
+let stopAvailability = null;
 let schoolDayEntries = [];
+let catalogProducts = {
+  bizcochos: { price: 500, active: true },
+  facturas: { price: 1000, active: true }
+};
+let catalogConfigured = false;
+let availabilityConfigured = false;
+let availabilityRemaining = { bizcochos: 0, facturas: 0 };
 let authLoadToken = 0;
 let placingOrder = false;
 
@@ -108,10 +116,17 @@ function stopStudentListeners() {
   if (stopDailyTotal) stopDailyTotal();
   if (stopOrders) stopOrders();
   if (stopSchoolDays) stopSchoolDays();
+  if (stopCatalog) stopCatalog();
+  if (stopAvailability) stopAvailability();
   stopDailyTotal = null;
   stopOrders = null;
   stopSchoolDays = null;
+  stopCatalog = null;
+  stopAvailability = null;
   schoolDayEntries = [];
+  catalogConfigured = false;
+  availabilityConfigured = false;
+  availabilityRemaining = { bizcochos: 0, facturas: 0 };
   serviceDateKey = "";
   serviceDateNumber = 0;
   dailyQuantity = 0;
@@ -191,6 +206,54 @@ function listenForDailyTotal(user, token) {
   });
 }
 
+function publishCatalogState() {
+  document.dispatchEvent(new CustomEvent("b411:catalog-config", {
+    detail: { products: catalogProducts, configured: catalogConfigured }
+  }));
+}
+
+function publishAvailabilityState() {
+  document.dispatchEvent(new CustomEvent("b411:stock-update", {
+    detail: { remaining: availabilityRemaining, configured: availabilityConfigured }
+  }));
+}
+
+function currentCartFitsAvailability(cart = currentCart) {
+  if (!catalogConfigured || !availabilityConfigured) return false;
+  return ["bizcochos", "facturas"].every((productId) => {
+    const quantity = Number(cart[productId] || 0);
+    return catalogProducts[productId]?.active === true &&
+      Number.isSafeInteger(quantity) && quantity <= availabilityRemaining[productId];
+  });
+}
+
+function listenForDailyAvailability(token) {
+  if (stopAvailability) stopAvailability();
+  const availabilityRef = doc(db, "dailyAvailability", String(serviceDateNumber));
+  stopAvailability = onSnapshot(availabilityRef, (snapshot) => {
+    if (token !== authLoadToken) return;
+    availabilityConfigured = snapshot.exists();
+    if (availabilityConfigured) {
+      const data = snapshot.data();
+      availabilityRemaining = {
+        bizcochos: Number(data.bizcochosRemaining || 0),
+        facturas: Number(data.facturasRemaining || 0)
+      };
+    } else {
+      availabilityRemaining = { bizcochos: 0, facturas: 0 };
+    }
+    publishAvailabilityState();
+    if (checkoutButton) checkoutButton.disabled =
+      countCartUnits(currentCart) < 1 || !currentCartFitsAvailability();
+  }, (error) => {
+    console.error("No se pudo consultar el stock de la jornada:", error);
+    availabilityConfigured = false;
+    availabilityRemaining = { bizcochos: 0, facturas: 0 };
+    publishAvailabilityState();
+    setCheckoutFeedback("No pudimos consultar el stock. Intentá nuevamente más tarde.", "error");
+  });
+}
+
 async function connectStudent(user, token) {
   if (!user.emailVerified) return;
   const profileSnapshot = await getDoc(doc(db, "users", user.uid));
@@ -200,6 +263,38 @@ async function connectStudent(user, token) {
   if (profile.role !== "student" || profile.active !== true) return;
 
   studentProfile = profile;
+
+  stopCatalog = onSnapshot(doc(db, "settings", "catalog"), (snapshot) => {
+    if (token !== authLoadToken) return;
+    catalogConfigured = snapshot.exists();
+    if (catalogConfigured) {
+      const products = snapshot.data().products || {};
+      catalogProducts = {
+        bizcochos: {
+          price: Number(products.bizcochos?.price || 0),
+          active: products.bizcochos?.active === true
+        },
+        facturas: {
+          price: Number(products.facturas?.price || 0),
+          active: products.facturas?.active === true
+        }
+      };
+    } else {
+      catalogProducts = {
+        bizcochos: { price: 500, active: true },
+        facturas: { price: 1000, active: true }
+      };
+    }
+    publishCatalogState();
+    if (checkoutButton) checkoutButton.disabled =
+      countCartUnits(currentCart) < 1 || !currentCartFitsAvailability();
+  }, (error) => {
+    console.error("No se pudo consultar el catálogo:", error);
+    catalogConfigured = false;
+    publishCatalogState();
+    setCheckoutFeedback("No pudimos consultar los precios y disponibilidad del catálogo.", "error");
+  });
+
   stopOrders = onSnapshot(
     query(collection(db, "orders"), where("uid", "==", user.uid)),
     (snapshot) => {
@@ -225,6 +320,7 @@ async function connectStudent(user, token) {
       if (previousServiceDate !== serviceDateNumber || !stopDailyTotal) {
         if (stopDailyTotal) stopDailyTotal();
         listenForDailyTotal(user, token);
+        listenForDailyAvailability(token);
       }
     } catch (error) {
       console.error("No se pudo calcular la próxima jornada:", error);
@@ -236,6 +332,7 @@ async function connectStudent(user, token) {
       try {
         prepareServiceDate([]);
         listenForDailyTotal(user, token);
+        listenForDailyAvailability(token);
       } catch (dateError) {
         console.error("No se pudo calcular la fecha sin calendario:", dateError);
       }
@@ -243,11 +340,11 @@ async function connectStudent(user, token) {
     setCheckoutFeedback("No pudimos actualizar el calendario escolar. Se mantiene la fecha ya cargada.", "error");
   });
 }
-
 document.addEventListener("b411:cart-updated", (event) => {
   currentCart = { ...event.detail.cart };
   currentCartTotal = Number(event.detail.total || 0);
-  if (checkoutButton) checkoutButton.disabled = countCartUnits(currentCart) < 1;
+  if (checkoutButton) checkoutButton.disabled =
+    countCartUnits(currentCart) < 1 || !currentCartFitsAvailability();
 });
 
 document.addEventListener("b411:daily-total", (event) => {
@@ -264,6 +361,18 @@ checkoutButton.addEventListener("click", () => {
     return;
   }
   if (countCartUnits(currentCart) < 1) return;
+  if (!catalogConfigured) {
+    setCheckoutFeedback("El catálogo todavía no fue configurado por administración.", "error");
+    return;
+  }
+  if (!availabilityConfigured) {
+    setCheckoutFeedback("El stock de la próxima jornada todavía no fue cargado por el personal.", "error");
+    return;
+  }
+  if (!currentCartFitsAvailability()) {
+    setCheckoutFeedback("Tu carrito supera el stock disponible o incluye un producto no habilitado.", "error");
+    return;
+  }
   prepareServiceDate();
   $("#checkout-total").textContent = formatARS(currentCartTotal);
   setCheckoutFeedback("Revisá el recreo y el medio de pago antes de enviar.");
@@ -303,7 +412,7 @@ checkoutForm.addEventListener("submit", async (event) => {
 
   const pickupSlot = $("#checkout-pickup").value;
   const paymentMethod = $("#checkout-payment").value;
-  const total = calculateCartTotal(currentCart);
+  let confirmedTotal = 0;
   const orderRef = doc(collection(db, "orders"));
   const dailyTotalId = user.uid + "_" + serviceDateNumber;
   const totalRef = doc(db, "dailyOrderTotals", dailyTotalId);
@@ -315,10 +424,37 @@ checkoutForm.addEventListener("submit", async (event) => {
   try {
     await runTransaction(db, async (transaction) => {
       const totalSnapshot = await transaction.get(totalRef);
+      const availabilityRef = doc(db, "dailyAvailability", String(serviceDateNumber));
+      const catalogRef = doc(db, "settings", "catalog");
+      const availabilitySnapshot = await transaction.get(availabilityRef);
+      const catalogSnapshot = await transaction.get(catalogRef);
       const oldQuantity = totalSnapshot.exists() ? Number(totalSnapshot.data().quantity || 0) : 0;
       const oldOrderCount = totalSnapshot.exists() ? Number(totalSnapshot.data().orderCount || 0) : 0;
       if (oldQuantity + quantity > 5) {
         throw new RangeError("Límite diario alcanzado. Te quedan " + Math.max(0, 5 - oldQuantity) + " unidad(es).");
+      }
+      if (!catalogSnapshot.exists()) throw new Error("catalog-not-configured");
+      if (!availabilitySnapshot.exists()) throw new Error("stock-not-configured");
+
+      const products = catalogSnapshot.data().products || {};
+      const bizcochosProduct = products.bizcochos || {};
+      const facturasProduct = products.facturas || {};
+      if (currentCart.bizcochos > 0 && bizcochosProduct.active !== true) {
+        throw new Error("bizcochos-unavailable");
+      }
+      if (currentCart.facturas > 0 && facturasProduct.active !== true) {
+        throw new Error("facturas-unavailable");
+      }
+      const stock = availabilitySnapshot.data();
+      const bizcochosRemaining = Number(stock.bizcochosRemaining || 0);
+      const facturasRemaining = Number(stock.facturasRemaining || 0);
+      if (currentCart.bizcochos > bizcochosRemaining || currentCart.facturas > facturasRemaining) {
+        throw new Error("stock-insufficient");
+      }
+      confirmedTotal = Number(currentCart.bizcochos || 0) * Number(bizcochosProduct.price)
+        + Number(currentCart.facturas || 0) * Number(facturasProduct.price);
+      if (!Number.isSafeInteger(confirmedTotal) || confirmedTotal < 1) {
+        throw new Error("catalog-invalid");
       }
 
       const orderData = {
@@ -331,7 +467,7 @@ checkoutForm.addEventListener("submit", async (event) => {
         dailyTotalId,
         items: { bizcochos: Number(currentCart.bizcochos || 0), facturas: Number(currentCart.facturas || 0) },
         quantity,
-        total,
+        total: confirmedTotal,
         pickupSlot,
         paymentMethod,
         paymentStatus: paymentMethod === "cash" ? "unpaid" : "pending_review",
@@ -348,11 +484,19 @@ checkoutForm.addEventListener("submit", async (event) => {
         latestOrderId: orderRef.id,
         updatedAt: serverTimestamp()
       });
+      transaction.update(availabilityRef, {
+        bizcochosRemaining: bizcochosRemaining - Number(currentCart.bizcochos || 0),
+        facturasRemaining: facturasRemaining - Number(currentCart.facturas || 0),
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid,
+        lastOrderId: orderRef.id,
+        lastAction: "reserved"
+      });
     });
 
     checkoutDialog.close();
     document.dispatchEvent(new CustomEvent("b411:clear-cart"));
-    setCheckoutFeedback("¡Pedido guardado!");
+    setCheckoutFeedback("¡Pedido guardado por " + formatARS(confirmedTotal) + "!");
     // El historial se actualiza automáticamente mediante el listener de Firestore.
     window.setTimeout(() => {
       const target = $("#mis-pedidos");
@@ -360,11 +504,21 @@ checkoutForm.addEventListener("submit", async (event) => {
     }, 120);
   } catch (error) {
     console.error("No se pudo guardar el pedido:", error);
-    const message = error.code === "permission-denied"
-      ? "Firebase rechazó el pedido. Revisá que las nuevas reglas estén publicadas y que estés dentro del horario."
-      : error.code === "failed-precondition"
-        ? "No se pudo guardar todavía. Actualizá la página e intentá nuevamente."
-        : error.message || "No se pudo guardar el pedido. Intentá otra vez.";
+    const message = error.message === "catalog-not-configured"
+      ? "El catálogo todavía no fue configurado por administración."
+      : error.message === "stock-not-configured"
+        ? "El personal todavía no cargó el stock para esta jornada."
+        : error.message === "stock-insufficient"
+          ? "El stock cambió mientras preparabas el pedido. Actualizá el carrito con las unidades disponibles."
+          : error.message === "bizcochos-unavailable" || error.message === "facturas-unavailable"
+            ? "Uno de los productos dejó de estar disponible. Actualizá el catálogo."
+            : error.message === "catalog-invalid"
+              ? "El catálogo tiene precios inválidos. Avisá al personal."
+              : error.code === "permission-denied"
+                ? "Firebase rechazó el pedido. Revisá la fecha, el stock y los permisos."
+                : error.code === "failed-precondition"
+                  ? "No se pudo guardar todavía. Actualizá la página e intentá nuevamente."
+                  : error.message || "No se pudo guardar el pedido. Intentá otra vez.";
     setCheckoutFeedback(message, "error");
   } finally {
     placingOrder = false;
