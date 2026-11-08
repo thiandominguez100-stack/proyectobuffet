@@ -199,3 +199,21 @@
 .payment-summary-grid article>small{font-size:9px;color:var(--muted)}
 .payment-summary-grid .button{width:100%;min-height:34px;padding-inline:8px;font-size:10px}
 @media(max-width:650px){.payment-summary-grid{grid-template-columns:1fr}}
+
+
+/* Calendario escolar editable. */
+.staff-calendar-form{display:grid;grid-template-columns:1fr 1fr 1.5fr auto;gap:10px;align-items:end;margin:14px 0}
+.staff-calendar-form label{display:grid;gap:6px;font-size:10px;font-weight:800;color:var(--muted)}
+.staff-calendar-form input,.staff-calendar-form select{width:100%;min-width:0;min-height:40px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-2);color:var(--text);font:inherit;font-size:11px}
+.staff-calendar-form[hidden]{display:none!important}
+.staff-calendar-list{display:grid;gap:8px;margin-top:10px}
+.staff-calendar-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.staff-calendar-row>div{display:grid;gap:3px;min-width:0}
+.staff-calendar-row strong{font-size:11px}
+.staff-calendar-row small{font-size:9px;color:var(--muted)}
+.staff-calendar-row .button{font-size:9px;min-height:30px;padding:0 8px}
+.staff-calendar-open,.staff-calendar-closed{font-size:8px;font-weight:800;letter-spacing:.5px}
+.staff-calendar-open{color:var(--green)}
+.staff-calendar-closed{color:var(--red)}
+@media(max-width:760px){.staff-calendar-form{grid-template-columns:1fr 1fr}.staff-calendar-form label:nth-child(3){grid-column:1/-1}.staff-calendar-form button{grid-column:1/-1}}
+@media(max-width:440px){.staff-calendar-form{grid-template-columns:1fr}.staff-calendar-form label:nth-child(3){grid-column:auto}}
