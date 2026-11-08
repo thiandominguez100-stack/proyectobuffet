@@ -13,6 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./css/app.css">
   <script type="module" src="./js/app.js"></script>
+  <script type="module" src="./js/student-auth.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -21,14 +22,84 @@
       <span class="brand-copy"><strong>Buffet 411</strong><small>Encargos escolares</small></span>
     </a>
     <nav class="top-actions" aria-label="Acciones principales">
-      <a class="nav-link active" href="#productos">Productos</a>
-      <a class="nav-link" href="#como-funciona">Cómo funciona</a>
+      <a class="nav-link active" data-member-only href="#productos" hidden>Productos</a>
+      <a class="nav-link" data-member-only href="#como-funciona" hidden>Cómo funciona</a>
+      <div class="student-account" id="student-account" hidden>
+        <button class="student-profile-trigger" id="student-profile-open" type="button" aria-label="Abrir mi perfil">
+          <span class="student-avatar" id="student-avatar"><span id="student-avatar-initials">A</span><img id="student-avatar-image" alt="" hidden></span>
+          <span class="student-account-name" id="student-display-name">Mi perfil</span>
+        </button>
+        <button class="button button-quiet student-logout" id="student-logout" type="button">Salir</button>
+      </div>
       <a class="button button-outline" href="./personal.html">Acceso del personal</a>
       <button class="icon-button" type="button" data-toggle-theme aria-label="Cambiar tema" title="Cambiar tema">◐</button>
     </nav>
   </header>
 
-  <main>
+  <section class="student-auth-wrap wrap" id="student-auth-gate">
+    <div class="student-auth-card">
+      <div class="student-auth-brand">
+        <span class="brand-mark">B<span>411</span></span>
+        <span><strong>Buffet 411</strong><small>Encargos escolares · IPET 411</small></span>
+      </div>
+      <span class="eyebrow"><span class="pulse-dot"></span> TU RECREO, MÁS ORGANIZADO</span>
+      <h1 id="student-auth-title">¡Bienvenido!</h1>
+      <p class="student-auth-subtitle" id="student-auth-subtitle">Ingresá a tu cuenta para ver los productos y preparar tu encargo.</p>
+      <div class="student-auth-tabs" id="student-auth-tabs">
+        <button class="student-auth-tab active" type="button" data-auth-mode="login">Ingresar</button>
+        <button class="student-auth-tab" type="button" data-auth-mode="register">Crear cuenta</button>
+      </div>
+      <form class="student-auth-form" id="student-login-form">
+        <label for="student-login-email">Correo electrónico</label>
+        <input id="student-login-email" name="email" type="email" autocomplete="username" placeholder="tu correo electrónico" required>
+        <label for="student-login-password">Contraseña</label>
+        <input id="student-login-password" name="password" type="password" autocomplete="current-password" minlength="8" placeholder="Tu contraseña" required>
+        <button class="button button-primary" id="student-login-submit" type="submit">Ingresar</button>
+        <button class="student-text-button" id="student-forgot-password" type="button">Olvidé mi contraseña</button>
+      </form>
+      <form class="student-auth-form" id="student-register-form" hidden>
+        <div class="student-form-grid">
+          <div class="student-form-wide">
+            <label for="student-register-name">Nombre para mostrar</label>
+            <input id="student-register-name" name="displayName" type="text" minlength="2" maxlength="32" autocomplete="nickname" placeholder="Cómo querés aparecer" required>
+          </div>
+          <div>
+            <label for="student-register-course">Curso</label>
+            <input id="student-register-course" name="course" type="text" maxlength="12" placeholder="Ej. 3°" required>
+          </div>
+          <div>
+            <label for="student-register-division">División</label>
+            <input id="student-register-division" name="division" type="text" maxlength="8" placeholder="Ej. A" required>
+          </div>
+          <div class="student-form-wide">
+            <label for="student-register-email">Correo electrónico</label>
+            <input id="student-register-email" name="email" type="email" autocomplete="email" placeholder="tu correo electrónico" required>
+          </div>
+          <div class="student-form-wide">
+            <label for="student-register-password">Contraseña (mínimo 8 caracteres)</label>
+            <input id="student-register-password" name="password" type="password" minlength="8" autocomplete="new-password" placeholder="Creá una contraseña" required>
+          </div>
+          <div class="student-form-wide">
+            <label for="student-register-confirm">Repetir contraseña</label>
+            <input id="student-register-confirm" name="passwordConfirm" type="password" minlength="8" autocomplete="new-password" placeholder="Repetí tu contraseña" required>
+          </div>
+        </div>
+        <button class="button button-primary" id="student-register-submit" type="submit">Crear mi cuenta</button>
+        <p class="student-form-note">Vas a tener que confirmar tu correo antes de usar la aplicación.</p>
+      </form>
+      <section class="student-verify-card" id="student-verify-notice" hidden>
+        <span class="student-verify-icon">✉</span>
+        <h2>Confirmá tu correo</h2>
+        <p>Te enviamos un enlace de verificación. Abrilo desde tu correo y después volvé acá.</p>
+        <button class="button button-primary" id="student-refresh-verification" type="button">Ya confirmé mi correo</button>
+        <button class="button button-outline" id="student-resend-verification" type="button">Reenviar correo</button>
+        <button class="student-text-button" id="student-verify-logout" type="button">Cerrar sesión</button>
+      </section>
+      <p class="student-auth-feedback" id="student-auth-feedback" role="status" aria-live="polite">Usá tu correo para ingresar o creá una cuenta nueva.</p>
+      <p class="student-privacy-note">Durante las pruebas usá datos de prueba. La apertura a alumnos requiere autorización de la escuela.</p>
+    </div>
+  </section>
+  <main id="student-app" hidden>
     <section class="hero wrap">
       <div class="hero-copy">
         <span class="eyebrow"><span class="pulse-dot"></span> IPET 411 · SERVICIO DE BUFFET</span>
@@ -112,6 +183,33 @@
     </section>
   </main>
 
-  <footer class="site-footer wrap"><a class="brand footer-brand" href="./index.html"><span class="brand-mark">B<span>411</span></span><span class="brand-copy"><strong>Buffet 411</strong><small>Encargos escolares</small></span></a><span>Una experiencia más simple para organizar el buffet.</span><span class="footer-status"><i></i> Primera versión en preparación</span></footer>
+  <footer class="site-footer wrap" id="student-footer" hidden><a class="brand footer-brand" href="./index.html"><span class="brand-mark">B<span>411</span></span><span class="brand-copy"><strong>Buffet 411</strong><small>Encargos escolares</small></span></a><span>Una experiencia más simple para organizar el buffet.</span><span class="footer-status"><i></i> Primera versión en preparación</span></footer>
+  <dialog class="student-profile-dialog" id="student-profile-dialog" aria-labelledby="student-profile-title">
+    <form class="student-profile-card" id="student-profile-form">
+      <div class="student-profile-heading">
+        <div><span class="eyebrow">TU CUENTA</span><h2 id="student-profile-title">Mi perfil</h2></div>
+        <button class="icon-button" id="student-profile-close" type="button" aria-label="Cerrar perfil">×</button>
+      </div>
+      <div class="student-profile-photo-row">
+        <span class="student-profile-avatar" id="student-profile-avatar"><span id="student-profile-initials">A</span><img id="student-profile-image" alt="Vista previa de foto de perfil" hidden></span>
+        <div><strong>Foto de perfil</strong><small>Elegí una imagen desde tu celular o computadora. Se guarda comprimida en tu cuenta.</small></div>
+      </div>
+      <label class="button button-outline student-file-button" for="student-photo-file">Elegir foto</label>
+      <input id="student-photo-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+      <button class="student-text-button student-remove-photo" id="student-remove-photo" type="button">Quitar foto actual</button>
+      <label for="student-profile-name">Nombre para mostrar</label>
+      <input id="student-profile-name" type="text" minlength="2" maxlength="32" required>
+      <div class="student-readonly-grid">
+        <div><label for="student-profile-course">Curso</label><input id="student-profile-course" type="text" readonly></div>
+        <div><label for="student-profile-division">División</label><input id="student-profile-division" type="text" readonly></div>
+      </div>
+      <p class="student-auth-feedback" id="student-profile-feedback" role="status" aria-live="polite"></p>
+      <div class="student-profile-actions">
+        <button class="button button-quiet" id="student-profile-cancel" type="button">Cancelar</button>
+        <button class="button button-primary" id="student-profile-save" type="submit">Guardar cambios</button>
+      </div>
+      <p class="student-form-note">Tu correo y curso no se pueden cambiar desde esta pantalla.</p>
+    </form>
+  </dialog>
 </body>
 </html>
