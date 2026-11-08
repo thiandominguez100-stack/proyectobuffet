@@ -8,6 +8,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -75,6 +76,11 @@ test.beforeEach(async () => {
       status: "available",
       createdAt: new Date(),
       createdBy: "admin-1"
+    });
+    await setDoc(doc(db, "schoolDays", "20261201"), {
+      open: false,
+      label: "Cierre de prueba",
+      updatedAt: new Date()
     });
   });
 });
@@ -213,4 +219,13 @@ test("solo administración puede enumerar perfiles y códigos", async () => {
 
   const codes = await assertSucceeds(getDocs(collection(db, "enrollmentCodes")));
   assert.equal(codes.size, 1);
+});
+
+
+test("solo administración puede eliminar un cierre del calendario escolar", async () => {
+  const adminDb = testEnv.authenticatedContext("admin-1").firestore();
+  await assertSucceeds(deleteDoc(doc(adminDb, "schoolDays", "20261201")));
+
+  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
+  await assertFails(deleteDoc(doc(staffDb, "schoolDays", "20261201")));
 });
