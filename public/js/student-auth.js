@@ -14,27 +14,27 @@ if (location.hostname.endsWith(".github.io")) {
   }
   if (footer) footer.hidden = false;
   if (account) account.hidden = true;
-} else {
-import { auth, db } from "./firebase.js";
-import {
-  createUserWithEmailAndPassword,
-  deleteUser,
-  getIdToken,
-  onAuthStateChanged,
-  reload,
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  signOut
-} from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
-import {
-  doc,
-  getDoc,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  writeBatch
-} from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
+else {
+  const { auth, db } = await import("./firebase.js");
+  const {
+    createUserWithEmailAndPassword,
+    deleteUser,
+    getIdToken,
+    onAuthStateChanged,
+    reload,
+    sendEmailVerification,
+    sendPasswordResetEmail,
+    signInWithEmailAndPassword,
+    signOut
+  } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js");
+  const {
+    doc,
+    getDoc,
+    serverTimestamp,
+    setDoc,
+    updateDoc,
+    writeBatch
+  } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
 
 const $ = (selector) => document.querySelector(selector);
 const authGate = $("#student-auth-gate");
