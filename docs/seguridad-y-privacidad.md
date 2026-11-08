@@ -12,11 +12,20 @@ Firestore inicia con denegación total de lectura y escritura. Esta política se
 - La recuperación se realiza mediante el flujo oficial de Firebase Authentication.
 - No almacenar contraseñas ni hashes de contraseñas en Firestore.
 
+## Inscripción de alumnos
+
+- La versión de revisión requiere un código aleatorio individual de 16 caracteres para crear cada perfil.
+- Cada código se genera desde el panel de administración, se almacena sin datos personales y solo puede consumirse una vez.
+- La lectura individual de un código requiere conocer el código; el listado completo queda reservado a administración.
+- El consumo del código y la creación del perfil ocurren en una única transacción validada por reglas de Firestore.
+- No se bloquean ni almacenan direcciones IP: alumnos que comparten Wi-Fi podrían compartir IP y los datos móviles pueden cambiarla.
+
 ## Autorización
 
 - Aplicar mínimo privilegio.
-- Los alumnos solo acceden a su perfil y pedidos.
-- El personal accede a vistas operativas, no a ajustes administrativos salvo permiso expreso.
+- Los alumnos solo acceden a su perfil, sus pedidos, sus fotos y su contador diario.
+- El personal accede a pedidos operativos; no puede enumerar perfiles ni contadores privados.
+- Solo administración puede enumerar perfiles y códigos de inscripción.
 - Los administradores pueden administrar configuración y cuentas.
 - El rol no puede ser cambiado por el propio usuario desde el navegador.
 - Toda operación crítica debe validarse con reglas de Firestore, no solo con controles visuales.
