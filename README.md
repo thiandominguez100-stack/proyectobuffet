@@ -42,9 +42,18 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 - `firestore.rules`: reglas de seguridad de Firestore.
 - `firebase.json`: configuración de Hosting y Firestore.
 
+## Cuentas y perfiles de alumnos
+
+- Registro e inicio de sesión con Firebase Authentication (correo y contraseña).
+- Verificación obligatoria del correo antes de entrar al catálogo.
+- Perfil de Firestore con nombre para mostrar, curso y división.
+- El alumno solo puede cambiar su nombre para mostrar; curso, división, rol y estado quedan protegidos.
+- Foto elegida desde el dispositivo, procesada localmente y guardada como JPEG cuadrado comprimido en un documento privado de Firestore (máximo 150.000 caracteres).
+- No se utiliza Firebase Storage ni se habilita facturación para las fotos.
+
 ## Estado actual
 
-El proyecto Firebase `buffet411-f80af` ya tiene una app web registrada y una base Cloud Firestore Standard creada. Authentication utiliza correo y contraseña. Las reglas de Firestore permanecen cerradas (`allow read, write: if false`) mientras se prepara el modelo y se prueban las reglas definitivas.
+El proyecto Firebase `buffet411-f80af` ya tiene una app web registrada y una base Cloud Firestore Standard creada. Authentication utiliza correo y contraseña. Las reglas permiten que cada alumno lea su propio perfil, cree un perfil con rol fijo `student`, edite únicamente su nombre para mostrar y gestione su foto privada. Los pedidos y ajustes operativos siguen bloqueados hasta implementar sus reglas específicas.
 
 **No usar con cuentas reales ni publicar como operativo** hasta terminar las reglas de seguridad, las pruebas y la revisión de permisos.
 
