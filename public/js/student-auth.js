@@ -16,6 +16,7 @@ if (location.hostname.endsWith(".github.io")) {
   if (account) account.hidden = true;
 } else {
   const { auth, db } = await import("./firebase.js");
+  const { normalizeEnrollmentCode, isValidEnrollmentCode } = await import("./enrollment.js");
   const {
     createUserWithEmailAndPassword,
     deleteUser,
@@ -227,14 +228,14 @@ registerForm.addEventListener("submit", async (event) => {
   const course = $("#student-register-course").value.trim();
   const division = $("#student-register-division").value.trim();
   const email = $("#student-register-email").value.trim();
-  const registrationCode = $("#student-register-code").value.trim().toUpperCase();
+  const registrationCode = normalizeEnrollmentCode($("#student-register-code").value);
   const password = $("#student-register-password").value;
   const confirmation = $("#student-register-confirm").value;
   if (displayName.length < 2 || displayName.length > 32 || !course || !division) {
     showFeedback("Completá nombre, curso y división correctamente.", "error");
     return;
   }
-  if (!/^[A-HJ-NP-Z2-9]{16}$/.test(registrationCode)) {
+  if (!isValidEnrollmentCode(registrationCode)) {
     showFeedback("Ingresá el código de inscripción de 16 caracteres que te entregó el buffet.", "error");
     return;
   }
