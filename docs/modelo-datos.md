@@ -20,7 +20,7 @@ Los importes se guardan como números enteros en pesos argentinos, nunca como te
 Perfil mínimo de usuario:
 
 - `uid`: igual al UID de Firebase Authentication.
-- `email`: correo del usuario autenticado.
+- El correo permanece en Firebase Authentication y no se duplica en Firestore.
 - `displayName`: nombre elegido/validado para el uso escolar.
 - `course`: curso.
 - `division`: división.
