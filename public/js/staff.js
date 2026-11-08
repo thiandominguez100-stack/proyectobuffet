@@ -115,7 +115,9 @@ async function checkStaffRole(user) {
 function renderEnrollmentCodes(snapshot) {
   const list = $("#staff-enrollment-code-list");
   list.replaceChildren();
-  const codes = snapshot.docs.map((item) => item.id).sort();
+  const codes = snapshot.docs
+    .map((item) => ({ code: item.id, course: item.data().course || "Curso", division: item.data().division || "División" }))
+    .sort((a, b) => a.course.localeCompare(b.course, "es", { numeric: true }) || a.division.localeCompare(b.division, "es"));
   if (!codes.length) {
     const empty = document.createElement("p");
     empty.className = "empty-state compact";
@@ -124,11 +126,17 @@ function renderEnrollmentCodes(snapshot) {
     return;
   }
 
-  for (const code of codes) {
+  for (const entry of codes) {
+    const code = entry.code;
     const row = document.createElement("div");
     row.className = "staff-enrollment-row";
+    const details = document.createElement("div");
+    details.className = "staff-enrollment-code-details";
     const value = document.createElement("code");
     value.textContent = code;
+    const placement = document.createElement("small");
+    placement.textContent = entry.course + " · División " + entry.division;
+    details.append(value, placement);
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "button button-outline";
@@ -161,7 +169,7 @@ function renderEnrollmentCodes(snapshot) {
         revoke.disabled = false;
       }
     });
-    row.append(value, copy, revoke);
+    row.append(details, copy, revoke);
     list.appendChild(row);
   }
 }
