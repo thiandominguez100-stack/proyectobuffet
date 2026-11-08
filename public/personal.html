@@ -103,6 +103,7 @@
           <div class="card-heading"><div><span class="eyebrow">ORGANIZACIÓN</span><h3>Pedidos individuales</h3></div><span class="muted-label" id="staff-orders-status">CARGANDO</span></div>
           <div class="staff-order-tools">
             <label class="staff-order-tool staff-order-search" for="staff-orders-search"><span>Buscar alumno</span><input id="staff-orders-search" type="search" placeholder="Nombre, curso, división o ID" autocomplete="off"></label>
+            <label class="staff-order-tool" for="staff-orders-payment-filter"><span>Estado de pago</span><select id="staff-orders-payment-filter"><option value="all">Todos los pagos</option><option value="unpaid">Efectivo pendiente</option><option value="pending_review">Mercado Pago por verificar</option><option value="paid">Pagados</option></select></label>
             <label class="staff-order-tool" for="staff-orders-slot-filter"><span>Horario de retiro</span><select id="staff-orders-slot-filter"><option value="all">Todos los recreos</option><option value="primer-recreo">Primer recreo · 08:50–09:00</option><option value="ultimo-recreo">Segundo recreo · 10:20–10:30</option></select></label>
             <label class="staff-order-tool" for="staff-orders-status-filter"><span>Estado</span><select id="staff-orders-status-filter"><option value="active">Todos los activos</option><option value="pending">Pendientes</option><option value="accepted">Aceptados</option><option value="preparing">En preparación</option><option value="ready">Listos para retirar</option><option value="delivered">Entregados</option><option value="cancelled">Cancelados</option><option value="all">Todos los pedidos</option></select></label>
           </div>
@@ -118,7 +119,15 @@
 
       <div class="staff-two-col">
         <section class="staff-card" id="calendario"><div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div><div class="empty-state compact"><span>▦</span><strong>Calendario editable</strong><p>Se podrán marcar feriados, vacaciones y días sin clases.</p></div></section>
-        <section class="staff-card" id="pagos"><div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div><div class="empty-state compact"><span>$</span><strong>Verificación manual</strong><p>El personal podrá confirmar efectivo o Mercado Pago.</p></div></section>
+        <section class="staff-card" id="pagos">
+          <div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div><span class="muted-label">PEDIDOS DE LA PRÓXIMA JORNADA</span></div>
+          <div class="payment-summary-grid">
+            <article><span>EFECTIVO PENDIENTE</span><strong id="staff-payment-cash-pending">$0</strong><small id="staff-payment-cash-count">0 pedidos</small><button class="button button-outline" type="button" data-payment-filter="unpaid">Ver pedidos</button></article>
+            <article><span>MERCADO PAGO A REVISAR</span><strong id="staff-payment-mp-pending">$0</strong><small id="staff-payment-mp-count">0 pedidos</small><button class="button button-outline" type="button" data-payment-filter="pending_review">Ver pedidos</button></article>
+            <article><span>PAGOS CONFIRMADOS</span><strong id="staff-payment-paid">$0</strong><small id="staff-payment-paid-count">0 pedidos</small><button class="button button-outline" type="button" data-payment-filter="paid">Ver pedidos</button></article>
+          </div>
+          <p class="table-footnote">Los pagos se verifican manualmente. Al revisar un pago, abrí el pedido y pulsá «Confirmar pago». No se consulta automáticamente Mercado Pago.</p>
+        </section>
       </div>
       <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos se guardan en Firebase. El stock y el calendario aún no están conectados.</span></div>
     </section>
