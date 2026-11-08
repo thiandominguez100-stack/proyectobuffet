@@ -118,7 +118,18 @@
       </div>
 
       <div class="staff-two-col">
-        <section class="staff-card" id="calendario"><div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div><div class="empty-state compact"><span>▦</span><strong>Calendario editable</strong><p>Se podrán marcar feriados, vacaciones y días sin clases.</p></div></section>
+        <section class="staff-card" id="calendario">
+          <div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div><span class="muted-label">EXCEPCIONES DE CLASES</span></div>
+          <p class="table-footnote">Marcá feriados, jornadas sin clases o aperturas especiales. El sistema usará estas excepciones para calcular la próxima jornada.</p>
+          <form id="staff-calendar-form" class="staff-calendar-form" hidden>
+            <label for="staff-calendar-date">Fecha<input id="staff-calendar-date" type="date" required></label>
+            <label for="staff-calendar-open">Tipo<select id="staff-calendar-open"><option value="false">No hay clases</option><option value="true">Sí hay clases</option></select></label>
+            <label for="staff-calendar-label">Descripción<input id="staff-calendar-label" type="text" maxlength="80" placeholder="Ej. Feriado / Jornada especial"></label>
+            <button class="button button-primary" id="staff-calendar-save" type="submit">Guardar fecha</button>
+          </form>
+          <p class="staff-auth-message" id="staff-calendar-feedback" role="status" aria-live="polite"></p>
+          <div class="staff-calendar-list" id="staff-calendar-list"><p class="empty-state compact">Consultando calendario…</p></div>
+        </section>
         <section class="staff-card" id="pagos">
           <div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div><span class="muted-label">PEDIDOS DE LA PRÓXIMA JORNADA</span></div>
           <div class="payment-summary-grid">
@@ -129,7 +140,7 @@
           <p class="table-footnote">Los pagos se verifican manualmente. Al revisar un pago, abrí el pedido y pulsá «Confirmar pago». No se consulta automáticamente Mercado Pago.</p>
         </section>
       </div>
-      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos se guardan en Firebase. El stock y el calendario aún no están conectados.</span></div>
+      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos se guardan en Firebase. El stock aún está pendiente de integración.</span></div>
     </section>
   </main>
   <footer class="site-footer wrap"><span>Buffet 411 · Panel interno</span><span class="footer-status"><i></i> Pedidos conectados</span></footer>
