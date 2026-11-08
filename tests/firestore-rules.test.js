@@ -226,6 +226,31 @@ test("solo administración puede enumerar perfiles y códigos", async () => {
 });
 
 
+test("solo administración puede crear excepciones válidas del calendario escolar", async () => {
+  const adminDb = testEnv.authenticatedContext("admin-1").firestore();
+  const schoolDay = {
+    dateNumber: 20261202,
+    open: false,
+    label: "Feriado de prueba",
+    updatedAt: serverTimestamp()
+  };
+  await assertSucceeds(setDoc(doc(adminDb, "schoolDays", "20261202"), schoolDay));
+
+  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
+  await assertFails(setDoc(doc(staffDb, "schoolDays", "20261203"), {
+    ...schoolDay,
+    dateNumber: 20261203
+  }));
+
+  const studentDb = testEnv.authenticatedContext("student-1", {
+    email_verified: true
+  }).firestore();
+  await assertFails(setDoc(doc(studentDb, "schoolDays", "20261204"), {
+    ...schoolDay,
+    dateNumber: 20261204
+  }));
+});
+
 test("solo administración puede eliminar un cierre del calendario escolar", async () => {
   const adminDb = testEnv.authenticatedContext("admin-1").firestore();
   await assertSucceeds(deleteDoc(doc(adminDb, "schoolDays", "20261201")));
