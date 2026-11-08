@@ -54,3 +54,13 @@ test("GitHub Pages no inicializa Firebase desde la lógica de catálogo", async 
   const app = await readFile(new URL("../public/js/app.js", import.meta.url), "utf8");
   assert.doesNotMatch(app, /from ["']\.\/firebase\.js["']/);
 });
+
+test("un fallo temporal al validar el perfil no cierra automáticamente la sesión", () => {
+  const start = auth.indexOf("async function loadStudentSession(user)");
+  const end = auth.indexOf("\ntabs.forEach", start);
+  const loader = auth.slice(start, end);
+  const catchBlock = loader.slice(loader.indexOf("} catch (error)"));
+  assert.doesNotMatch(catchBlock, /signOut\\(auth\\)/);
+  assert.match(catchBlock, /Tu sesión sigue abierta/);
+  assert.match(auth, /await loadStudentSession\(auth\.currentUser\)/);
+});
