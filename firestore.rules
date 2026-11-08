@@ -128,7 +128,7 @@ service cloud.firestore {
     match /enrollmentCodes/{codeId} {
       // El alumno solo puede consultar un código disponible que ya conoce.
       // La colección no se puede enumerar desde cuentas de alumnos.
-      allow get: if isAdmin() || (signedIn() && resource.data.status == 'available');
+      allow get: if (signedIn() && resource.data.status == 'available') || isAdmin();
       allow list: if isAdmin();
 
       allow create: if isAdmin()
@@ -236,9 +236,9 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      // El contador diario es privado del alumno; el personal opera desde los pedidos.
-      allow get: if signedIn() && (resource == null || resource.data.uid == request.auth.uid);
-      allow list: if signedIn() && resource.data.uid == request.auth.uid;
+      // El personal necesita consultar pedidos para organizar la producción y los retiros.
+      allow get: if isStaff() || (signedIn() && (resource == null || resource.data.uid == request.auth.uid));
+      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
 
       allow create: if activeStudent(request.auth.uid)
         && orderWindowOpen()
