@@ -1,5 +1,5 @@
 "use strict";
-var CACHE_NAME = "buffet411-shell-v8";
+var CACHE_NAME = "buffet411-shell-v9";
 var APP_SHELL = [
   "/",
   "./index.html",
@@ -11,7 +11,10 @@ var APP_SHELL = [
   "./js/student-auth.js",
   "./js/student-orders.js",
   "./manifest.webmanifest",
-  "./favicon.svg"
+  "./favicon.svg",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-maskable-512.png"
 ];
 
 self.addEventListener("install", function (event) {
