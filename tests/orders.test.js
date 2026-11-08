@@ -12,6 +12,7 @@ const rules = await readFile(new URL("../firestore.rules", import.meta.url), "ut
 const orderClient = await readFile(new URL("../public/js/student-orders.js", import.meta.url), "utf8");
 const studentHtml = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const staffHtml = await readFile(new URL("../public/personal.html", import.meta.url), "utf8");
+const staffSource = await readFile(new URL("../public/js/staff.js", import.meta.url), "utf8");
 
 test("la fecha del pedido se convierte a la clave numérica única YYYYMMDD", () => {
   assert.equal(getDateNumber("2026-11-09"), 20261109);
@@ -65,9 +66,9 @@ test("el alumno puede confirmar el recreo y el método de pago", () => {
 });
 
 
-test("GitHub Pages no acepta pedidos ni consulta Firestore", async () => {
+test("los dominios que no son de producción no aceptan pedidos ni consultan Firestore", async () => {
   const preview = orderClient.slice(0, orderClient.indexOf("} else {"));
-  assert.match(preview, /location\.hostname\.endsWith\("\.github\.io"\)/);
+  assert.match(preview, /location\.hostname !== "buffet411-f80af\.web\.app"/);
   assert.match(preview, /checkout\.disabled = true/);
   assert.doesNotMatch(preview, /runTransaction|onSnapshot|firebase\.js/);
 });
@@ -75,7 +76,7 @@ test("GitHub Pages no acepta pedidos ni consulta Firestore", async () => {
 
 test("el carrito local nunca habilita checkout desde GitHub Pages", async () => {
   const app = await readFile(new URL("../public/js/app.js", import.meta.url), "utf8");
-  assert.match(app, /previewOnly = window\.location\.hostname\.endsWith\("\.github\.io"\)/);
+  assert.match(app, /previewOnly = window\.location\.hostname !== "buffet411-f80af\.web\.app"/);
   assert.match(app, /checkoutButton\.disabled = previewOnly \|\| count < 1/);
 });
 
@@ -86,5 +87,36 @@ test("el domingo puede crear pedidos para el lunes y el sábado queda excluido",
   assert.equal(isOrderWindowOpen(new Date("2026-11-07T16:00:00.000Z")), false);
   assert.match(rules, /request\.time\.dayOfWeek\(\) == 7/);
   assert.match(rules, /request\.time\.dayOfWeek\(\) < 6 \|\| request\.time\.dayOfWeek\(\) == 7/);
-  assert.match(rules, /dateAt\.date\(\) == request\.time\.date\(\) \+ duration\.value\(1, 'd'\)/);
+  assert.match(rules, /function schoolDateIsOpen/);
+  assert.match(rules, /function schoolDateIsClosed/);
+  assert.match(rules, /sameCalendarDate\(dateAt, day1\)/);
+  assert.match(rules, /schoolDateIsClosed\(day1\)/);
+});
+
+
+test("alumnos y personal utilizan las excepciones del calendario escolar", () => {
+  assert.match(orderClient, /onSnapshot\(getStudentCalendarQuery\(\)/);
+  assert.match(orderClient, /getNextSchoolDate\(new Date\(\), \{ openDates, closedDates, maxDays: 7 \}\)/);
+  assert.match(staffSource, /getCalendarOptions/);
+  assert.match(rules, /schoolDateIsClosed/);
+  assert.match(rules, /schoolDateIsOpen/);
+});
+
+
+test("los pedidos validan precios del catálogo y reservan stock en la misma transacción", () => {
+  assert.match(orderClient, /doc\(db, "settings", "catalog"\)/);
+  assert.match(orderClient, /doc\(db, "dailyAvailability"/);
+  assert.match(orderClient, /transaction\.update\(availabilityRef/);
+  assert.match(orderClient, /lastAction: "reserved"/);
+  assert.match(rules, /function hasAtomicAvailability/);
+  assert.match(rules, /function validOrderItems/);
+  assert.match(rules, /match \/dailyAvailability\/\{dateNumber\}/);
+});
+
+
+test("el checkout exige una nueva confirmación cuando cambia el precio del catálogo", () => {
+  assert.match(orderClient, /checkoutQuotedTotal = currentCartTotal/);
+  assert.match(orderClient, /confirmedTotal !== checkoutQuotedTotal/);
+  assert.match(orderClient, /price-changed/);
+  assert.match(orderClient, /El precio cambió mientras confirmabas/);
 });

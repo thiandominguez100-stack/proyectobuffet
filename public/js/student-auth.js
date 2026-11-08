@@ -1,4 +1,5 @@
-if (location.hostname.endsWith(".github.io")) {
+const isLocalEmulator = ["localhost", "127.0.0.1"].includes(location.hostname);
+if (location.hostname !== "buffet411-f80af.web.app" && !isLocalEmulator) {
   // GitHub Pages is only a static preview; never collect credentials or profile data here.
   const gate = document.querySelector("#student-auth-gate");
   const app = document.querySelector("#student-app");
@@ -16,6 +17,7 @@ if (location.hostname.endsWith(".github.io")) {
   if (account) account.hidden = true;
 } else {
   const { auth, db } = await import("./firebase.js");
+  const { normalizeEnrollmentCode, isValidEnrollmentCode } = await import("./enrollment.js");
   const {
     createUserWithEmailAndPassword,
     deleteUser,
@@ -30,7 +32,7 @@ if (location.hostname.endsWith(".github.io")) {
     doc,
     getDoc,
     serverTimestamp,
-    setDoc,
+    runTransaction,
     updateDoc,
     writeBatch
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
@@ -224,13 +226,16 @@ registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (authOperationInProgress) return;
   const displayName = $("#student-register-name").value.trim();
-  const course = $("#student-register-course").value.trim();
-  const division = $("#student-register-division").value.trim();
   const email = $("#student-register-email").value.trim();
+  const registrationCode = normalizeEnrollmentCode($("#student-register-code").value);
   const password = $("#student-register-password").value;
   const confirmation = $("#student-register-confirm").value;
-  if (displayName.length < 2 || displayName.length > 32 || !course || !division) {
-    showFeedback("Completá nombre, curso y división correctamente.", "error");
+  if (displayName.length < 2 || displayName.length > 32) {
+    showFeedback("Ingresá un nombre para mostrar de entre 2 y 32 caracteres.", "error");
+    return;
+  }
+  if (!isValidEnrollmentCode(registrationCode)) {
+    showFeedback("Ingresá el código de inscripción de 16 caracteres que te entregó el buffet.", "error");
     return;
   }
   if (password.length < 8) {
@@ -250,15 +255,35 @@ registerForm.addEventListener("submit", async (event) => {
   try {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     newUser = credential.user;
-    await setDoc(doc(db, "users", newUser.uid), {
-      uid: newUser.uid,
-      displayName,
-      course,
-      division,
-      role: "student",
-      active: true,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+    await runTransaction(db, async (transaction) => {
+      const codeRef = doc(db, "enrollmentCodes", registrationCode);
+      const codeSnapshot = await transaction.get(codeRef);
+      if (!codeSnapshot.exists() || codeSnapshot.data().status !== "available") {
+        throw new Error("ENROLLMENT_CODE_INVALID");
+      }
+
+      const codeData = codeSnapshot.data();
+      if (typeof codeData.course !== "string" || typeof codeData.division !== "string") {
+        throw new Error("ENROLLMENT_CODE_INVALID");
+      }
+
+      const userRef = doc(db, "users", newUser.uid);
+      transaction.set(userRef, {
+        uid: newUser.uid,
+        displayName,
+        course: codeData.course,
+        division: codeData.division,
+        registrationCodeId: registrationCode,
+        role: "student",
+        active: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      transaction.update(codeRef, {
+        status: "used",
+        usedBy: newUser.uid,
+        usedAt: serverTimestamp()
+      });
     });
     showVerificationPanel();
     try {
@@ -270,16 +295,59 @@ registerForm.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     console.error("No se pudo crear la cuenta:", error);
-    if (newUser) await deleteUser(newUser).catch(() => {});
+    let preserveAccount = false;
+    let profileCheckFailed = false;
+
+    if (newUser) {
+      try {
+        // A network error may happen after Firestore committed both writes.
+        // Never delete the Auth user until we know that the profile was not created.
+        const existingProfile = await getDoc(doc(db, "users", newUser.uid));
+        preserveAccount = existingProfile.exists()
+          && existingProfile.data().uid === newUser.uid
+          && existingProfile.data().role === "student"
+          && existingProfile.data().registrationCodeId === registrationCode;
+
+        if (!preserveAccount && !existingProfile.exists()) {
+          try {
+            await deleteUser(newUser);
+          } catch (deleteError) {
+            console.error("No se pudo limpiar la cuenta de registro incompleta:", deleteError);
+          }
+        }
+      } catch (profileError) {
+        profileCheckFailed = true;
+        console.error("No se pudo verificar si el perfil se creó:", profileError);
+      }
+    }
+
+    if (preserveAccount) {
+      showVerificationPanel();
+      try {
+        await sendEmailVerification(newUser);
+        showFeedback("La cuenta se creó correctamente. Te enviamos el correo de verificación; si no lo recibís, podés reenviarlo desde esta pantalla.", "success");
+      } catch (mailError) {
+        console.error("No se pudo enviar la verificación tras recuperar el registro:", mailError);
+        showFeedback("La cuenta se creó correctamente, pero no pudimos enviar el correo. Tocá «Reenviar correo» para intentar otra vez.", "error");
+      }
+      return;
+    }
+
+    if (profileCheckFailed) {
+      await signOut(auth).catch(() => {});
+      showSignedOut("No pudimos confirmar si tu cuenta se creó. No uses otro código ni vuelvas a registrarte todavía; intentá ingresar con el mismo correo más tarde o consultá al personal.", "error");
+      return;
+    }
+
     const message = error.code === "auth/email-already-in-use"
-      ? "Ese correo ya tiene una cuenta. Probá ingresar."
-      : error.code === "auth/invalid-email"
-        ? "Ingresá una dirección de correo válida."
-        : error.code === "auth/weak-password"
-          ? "Elegí una contraseña más segura, de al menos 8 caracteres."
-          : error.code === "permission-denied"
-            ? "Firebase no permitió guardar el perfil. Revisaremos las reglas."
-            : "No se pudo crear la cuenta. Revisá los datos e intentá nuevamente.";
+        ? "Ese correo ya tiene una cuenta. Probá ingresar."
+        : error.code === "auth/invalid-email"
+          ? "Ingresá una dirección de correo válida."
+          : error.code === "auth/weak-password"
+            ? "Elegí una contraseña más segura, de al menos 8 caracteres."
+            : error.message === "ENROLLMENT_CODE_INVALID" || error.code === "permission-denied"
+              ? "El código no existe, ya fue utilizado o no está habilitado. Pedí uno al personal del buffet."
+              : "No se pudo crear la cuenta. Revisá los datos e intentá nuevamente.";
     showAuthMode("register");
     showFeedback(message, "error");
   } finally {
@@ -319,6 +387,8 @@ $("#student-refresh-verification").addEventListener("click", async () => {
   if (!auth.currentUser) return;
   try {
     await reload(auth.currentUser);
+    // Refresh the ID token so order listeners receive email_verified=true too.
+    await auth.currentUser.getIdToken(true);
     await loadStudentSession(auth.currentUser);
   } catch (error) {
     console.error(error);

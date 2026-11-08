@@ -45,7 +45,9 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 ## Cuentas y perfiles de alumnos
 
 - Registro e inicio de sesión con Firebase Authentication (correo y contraseña).
+- El registro requiere un código de inscripción individual de un solo uso, emitido desde el panel por una cuenta administradora. El código se consume en la misma transacción que crea el perfil.
 - Verificación obligatoria del correo antes de entrar al catálogo.
+- El frontend solo conecta con Firebase Authentication y Firestore desde `buffet411-f80af.web.app`; los demás dominios funcionan en modo de demostración y no consultan ni escriben datos reales.
 - Perfil de Firestore con nombre para mostrar, curso y división; el correo queda únicamente en Firebase Authentication.
 - El alumno solo puede cambiar su nombre para mostrar; curso, división, rol y estado quedan protegidos.
 - Foto elegida desde el dispositivo, procesada localmente y guardada como JPEG cuadrado comprimido en un documento privado de Firestore (máximo 150.000 caracteres).
@@ -59,16 +61,18 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 
 ## Estado actual
 
+Se está preparando en la rama `security/audit-and-enrollment-codes` una revisión de seguridad que incorpora códigos de inscripción de un solo uso asociados a curso y división, elimina la selección libre de esos datos en el registro, limita la lectura de perfiles y contadores a los roles que los necesitan, y agrega pruebas del flujo de inscripción. Esta rama no se ha publicado en Firebase Hosting ni en Firestore; requiere validación de CI/emulador y revisión funcional antes de integrarse.
+
 El proyecto Firebase `buffet411-f80af` tiene Hosting y Authentication activos. El usuario confirmó manualmente en Firebase Hosting el flujo principal: los alumnos pueden crear pedidos, el personal los recibe en vivo, puede actualizar su estado y marcar pagos, y el alumno puede consultar sus pedidos. El acceso de alumnos, el catálogo y la gestión básica de pedidos fueron comprobados manualmente.
 
 El panel del personal incorpora ahora búsqueda por nombre, curso, división e identificador, filtros por recreo y estado, y paginación de 25 pedidos por página. Los totales de producción se calculan sobre todos los pedidos activos, independientemente de la página o los filtros visibles. Estos cambios de interfaz están guardados en GitHub, pero todavía deben pasar las pruebas automáticas y publicarse en Firebase Hosting. El repositorio contiene reglas explícitas para pedidos y límites diarios en `firestore.rules`; cualquier cambio de reglas debe publicarse también en Firestore Console. La corrección del horario dominical está preparada en GitHub y debe quedar publicada tanto en Firestore Rules como en Hosting (`public/js/domain.js`) antes de considerar habilitados los pedidos de domingo.
 
 Las pruebas de `npm test` verifican lógica y estructura; no sustituyen una prueba con Firebase ni una prueba del emulador.
 
-El calendario escolar editable y el control de stock/precios todavía no están integrados. La PWA ya tiene iconos PNG de 192×192 y 512×512, además de un icono maskable de 512×512, preparados para la futura TWA con Bubblewrap. Antes de generar la APK faltará validar la PWA con Bubblewrap, definir los datos Android de la aplicación y comprobar el archivo Digital Asset Links del dominio; se debe conservar cualquier keystore de firma existente para poder actualizar la misma app. No abrir el servicio a todos los alumnos hasta completar las pruebas, revisar privacidad/datos y obtener autorización de la escuela. Mantener el proyecto en Firebase Spark; no habilitar Blaze ni servicios pagos sin una decisión expresa del responsable.
+En la rama de preparación, el calendario escolar permite cargar excepciones; el catálogo permite cambiar precios y habilitar productos (administración); cada código asigna automáticamente el curso y división correspondiente; el personal puede cargar stock por jornada; cada pedido reserva stock en la misma transacción y las cancelaciones autorizadas lo devuelven. El control de pagos continúa siendo manual (sin API de Mercado Pago). Los cambios están en revisión y no deben fusionarse ni publicarse hasta que pasen CI/emulador y las pruebas funcionales completas. La PWA ya tiene iconos PNG de 192×192 y 512×512, además de un icono maskable de 512×512, preparados para la futura TWA con Bubblewrap. Antes de generar la APK faltará validar la PWA con Bubblewrap, definir los datos Android de la aplicación y comprobar el archivo Digital Asset Links del dominio; se debe conservar cualquier keystore de firma existente para poder actualizar la misma app. No abrir el servicio a todos los alumnos hasta completar las pruebas, revisar privacidad/datos y obtener autorización de la escuela. Mantener el proyecto en Firebase Spark; no habilitar Blaze ni servicios pagos sin una decisión expresa del responsable.
 
 ## Privacidad
 
 Este repositorio contiene código y documentación, no datos de alumnos. Nunca subir contraseñas, tokens, claves privadas, listas de alumnos, correos reales, pedidos ni comprobantes.
 
-El repositorio está configurado actualmente como público: revisar su visibilidad antes de incorporar material interno o identificable de la escuela.
+El repositorio está configurado actualmente como público: revisar su visibilidad antes de incorporar material interno o identificable de la escuela. Las pruebas locales usan el proyecto ficticio `demo-buffet411-local` en los emuladores Auth (9099) y Firestore (8080); `localhost` nunca se conecta a Firebase de producción.

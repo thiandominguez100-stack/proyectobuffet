@@ -2,11 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [app, studentPage, staffPage, serviceWorker] = await Promise.all([
+const [app, studentPage, staffPage, serviceWorker, hostingConfig] = await Promise.all([
   readFile(new URL("../public/js/app.js", import.meta.url), "utf8"),
   readFile(new URL("../public/index.html", import.meta.url), "utf8"),
   readFile(new URL("../public/personal.html", import.meta.url), "utf8"),
-  readFile(new URL("../public/sw.js", import.meta.url), "utf8")
+  readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
+  readFile(new URL("../firebase.json", import.meta.url), "utf8")
 ]);
 
 test("el módulo principal no se bloquea por referencias Firebase no importadas", () => {
@@ -29,7 +30,7 @@ test("el tema se aplica al cargar, se puede alternar y se guarda", () => {
 });
 
 test("la caché de la aplicación cambia de versión al publicar una corrección", () => {
-  assert.match(serviceWorker, /buffet411-shell-v10/);
+  assert.match(serviceWorker, /buffet411-shell-v13/);
 });
 
 test("el panel solo anuncia pedidos en vivo tras confirmar la conexión remota", async () => {
@@ -48,4 +49,30 @@ test("el manifiesto PWA incluye iconos PNG de 192 y 512 y uno maskable para Andr
   assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "any"));
   assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable"));
   assert.match(serviceWorker, /\.\/icons\/icon-512\.png/);
+});
+
+
+test("Firebase Hosting publica cabeceras HTTP de seguridad", () => {
+  const config = JSON.parse(hostingConfig);
+  const headers = config.hosting.headers.flatMap((entry) => entry.headers);
+  const value = (name) => headers.find((header) => header.key.toLowerCase() === name.toLowerCase())?.value;
+  assert.equal(value("X-Content-Type-Options"), "nosniff");
+  assert.equal(value("X-Frame-Options"), "DENY");
+  assert.equal(value("Referrer-Policy"), "strict-origin-when-cross-origin");
+  assert.match(value("Permissions-Policy"), /camera=\(\)/);
+  assert.match(value("Strict-Transport-Security"), /max-age=31536000/);
+});
+
+
+test("localhost se conecta únicamente a emuladores y no al proyecto de producción", async () => {
+  const firebase = await readFile(new URL("../public/js/firebase.js", import.meta.url), "utf8");
+  const staff = await readFile(new URL("../public/js/staff.js", import.meta.url), "utf8");
+  const auth = await readFile(new URL("../public/js/student-auth.js", import.meta.url), "utf8");
+  const orders = await readFile(new URL("../public/js/student-orders.js", import.meta.url), "utf8");
+  assert.match(firebase, /projectId: "demo-buffet411-local"/);
+  assert.match(firebase, /connectAuthEmulator\(auth, "http:\/\/127\.0\.0\.1:9099"/);
+  assert.match(firebase, /connectFirestoreEmulator\(db, "127\.0\.0\.1", 8080\)/);
+  assert.match(staff, /location\.hostname !== "buffet411-f80af\.web\.app" && !isLocalEmulator/);
+  assert.match(auth, /location\.hostname !== "buffet411-f80af\.web\.app" && !isLocalEmulator/);
+  assert.match(orders, /location\.hostname !== "buffet411-f80af\.web\.app" && !isLocalEmulator/);
 });

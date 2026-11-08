@@ -175,3 +175,67 @@
 .staff-orders-pagination .button:disabled{opacity:.4;cursor:not-allowed}
 @media(max-width:760px){.staff-order-tools{grid-template-columns:1fr 1fr}.staff-order-search{grid-column:1/-1}}
 @media(max-width:480px){.staff-order-tools{grid-template-columns:1fr}.staff-order-search{grid-column:auto}.staff-orders-pagination{align-items:flex-start;flex-direction:column}.staff-orders-pagination>div{width:100%}.staff-orders-pagination .button{flex:1}}
+
+
+/* Gestión de códigos individuales de inscripción */
+.staff-enrollment-card>p{max-width:760px;color:var(--muted);margin:10px 0 16px}
+.staff-enrollment-list{display:grid;gap:8px;margin-top:14px}
+.staff-enrollment-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);background:var(--surface-2);border-radius:var(--radius)}
+.staff-enrollment-row code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:15px;font-weight:800;letter-spacing:.12em;color:var(--text);margin-right:auto;overflow-wrap:anywhere}
+.staff-enrollment-row .button{min-height:36px;padding-inline:12px}
+@media(max-width:560px){.staff-enrollment-row{align-items:stretch}.staff-enrollment-row code{width:100%;margin:0}.staff-enrollment-row .button{flex:1}}
+
+.staff-enrollment-controls{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:14px 0}
+.staff-enrollment-count{display:grid;gap:6px;min-width:200px;max-width:260px;color:var(--text);font-weight:650}
+.staff-enrollment-count input{width:100%;min-height:42px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);font:inherit}
+.staff-enrollment-count input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+@media(max-width:560px){.staff-enrollment-controls{align-items:stretch;flex-direction:column}.staff-enrollment-count{max-width:none}.staff-enrollment-controls>.button{width:100%}}
+
+
+.payment-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.payment-summary-grid article{display:grid;gap:6px;min-width:0;padding:13px;background:var(--surface-2);border:1px solid var(--line)}
+.payment-summary-grid article>span{font-size:8px;font-weight:800;letter-spacing:.7px;color:var(--muted)}
+.payment-summary-grid article>strong{font-size:19px;letter-spacing:-.5px}
+.payment-summary-grid article>small{font-size:9px;color:var(--muted)}
+.payment-summary-grid .button{width:100%;min-height:34px;padding-inline:8px;font-size:10px}
+@media(max-width:650px){.payment-summary-grid{grid-template-columns:1fr}}
+
+
+/* Calendario escolar editable. */
+.staff-calendar-form{display:grid;grid-template-columns:1fr 1fr 1.5fr auto;gap:10px;align-items:end;margin:14px 0}
+.staff-calendar-form label{display:grid;gap:6px;font-size:10px;font-weight:800;color:var(--muted)}
+.staff-calendar-form input,.staff-calendar-form select{width:100%;min-width:0;min-height:40px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-2);color:var(--text);font:inherit;font-size:11px}
+.staff-calendar-form[hidden]{display:none!important}
+.staff-calendar-list{display:grid;gap:8px;margin-top:10px}
+.staff-calendar-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.staff-calendar-row>div{display:grid;gap:3px;min-width:0}
+.staff-calendar-row strong{font-size:11px}
+.staff-calendar-row small{font-size:9px;color:var(--muted)}
+.staff-calendar-row .button{font-size:9px;min-height:30px;padding:0 8px}
+.staff-calendar-open,.staff-calendar-closed{font-size:8px;font-weight:800;letter-spacing:.5px}
+.staff-calendar-open{color:var(--green)}
+.staff-calendar-closed{color:var(--red)}
+@media(max-width:760px){.staff-calendar-form{grid-template-columns:1fr 1fr}.staff-calendar-form label:nth-child(3){grid-column:1/-1}.staff-calendar-form button{grid-column:1/-1}}
+@media(max-width:440px){.staff-calendar-form{grid-template-columns:1fr}.staff-calendar-form label:nth-child(3){grid-column:auto}}
+
+
+/* Gestión del catálogo, precios y stock por jornada. */
+.staff-catalog-form,.staff-stock-form{display:grid;gap:12px;margin:14px 0}
+.staff-catalog-product{display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:12px;align-items:end;padding:12px 0;border-top:1px solid var(--line)}
+.staff-catalog-product>strong{font-size:12px;align-self:center}
+.staff-catalog-product label,.staff-stock-form label{display:grid;gap:6px;font-size:10px;font-weight:800;color:var(--muted)}
+.staff-catalog-product input[type=number],.staff-stock-form input{width:100%;min-height:40px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-2);color:var(--text);font:inherit;font-size:12px}
+.staff-catalog-product .staff-check-label{display:flex;align-items:center;gap:8px;min-height:40px}
+.staff-catalog-product .staff-check-label input{width:16px;height:16px;accent-color:var(--blue)}
+.staff-stock-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px;padding-top:15px;border-top:1px solid var(--line)}
+.staff-stock-heading strong{font-size:12px}
+.staff-stock-heading span{font-size:10px;font-weight:800;color:var(--blue)}
+.staff-stock-form{grid-template-columns:1fr 1fr auto;align-items:end}
+.staff-stock-form label{min-width:0}
+@media(max-width:760px){.staff-catalog-product{grid-template-columns:1fr 1fr}.staff-catalog-product>strong{grid-column:1/-1}.staff-stock-form{grid-template-columns:1fr 1fr}.staff-stock-form button{grid-column:1/-1}}
+@media(max-width:440px){.staff-catalog-product,.staff-stock-form{grid-template-columns:1fr}.staff-catalog-product>strong{grid-column:auto}}
+
+
+.staff-enrollment-code-details{display:grid;gap:3px;min-width:0}
+.staff-enrollment-code-details code{font-size:11px;letter-spacing:.5px}
+.staff-enrollment-code-details small{font-size:9px;color:var(--muted)}

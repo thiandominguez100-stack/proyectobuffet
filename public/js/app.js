@@ -1,7 +1,6 @@
 import {
   PRODUCTS,
   addProductToCart,
-  calculateCartTotal,
   countCartUnits,
   createEmptyCart,
   formatARS,
@@ -63,6 +62,42 @@ import {
   var feedback = document.querySelector("[data-cart-feedback]");
   var checkoutButton = document.querySelector("#checkout-open");
   var bookedQuantity = 0;
+  var previewOnly = window.location.hostname !== "buffet411-f80af.web.app" && !["localhost", "127.0.0.1"].includes(window.location.hostname);
+  var catalogConfigured = previewOnly;
+  var stockConfigured = previewOnly;
+  var catalogPrices = { bizcochos: PRODUCTS.bizcochos.price, facturas: PRODUCTS.facturas.price };
+  var catalogEnabled = { bizcochos: true, facturas: true };
+  var stockRemaining = { bizcochos: previewOnly ? 999 : 0, facturas: previewOnly ? 999 : 0 };
+
+  function calculateCurrentTotal(currentCart) {
+    return Object.keys(catalogPrices).reduce(function (sum, productId) {
+      return sum + catalogPrices[productId] * Number(currentCart[productId] || 0);
+    }, 0);
+  }
+
+  function isCurrentCartAvailable() {
+    if (previewOnly) return true;
+    if (!catalogConfigured || !stockConfigured) return false;
+    return Object.keys(catalogPrices).every(function (productId) {
+      var quantity = Number(cart[productId] || 0);
+      return quantity === 0 || (catalogEnabled[productId] && quantity <= stockRemaining[productId]);
+    });
+  }
+
+  function renderProductAvailability() {
+    Object.keys(catalogPrices).forEach(function (productId) {
+      var price = document.querySelector('[data-product-price="' + productId + '"]');
+      var status = document.querySelector('[data-product-availability="' + productId + '"]');
+      if (price) price.textContent = formatARS(catalogPrices[productId]);
+      if (!status) return;
+      if (previewOnly) status.textContent = "Vista de demostración";
+      else if (!catalogConfigured) status.textContent = "Catálogo pendiente";
+      else if (!stockConfigured) status.textContent = "Stock sin cargar";
+      else if (!catalogEnabled[productId]) status.textContent = "No disponible";
+      else if (stockRemaining[productId] <= 0) status.textContent = "Agotado";
+      else status.textContent = stockRemaining[productId] + " unidades disponibles";
+    });
+  }
 
   function showFeedback(message, kind) {
     if (!feedback) return;
@@ -77,10 +112,10 @@ import {
     var count = countCartUnits(cart);
     var combinedCount = bookedQuantity + count;
     countTarget.textContent = String(combinedCount);
-    totalTarget.textContent = formatARS(calculateCartTotal(cart));
+    totalTarget.textContent = formatARS(calculateCurrentTotal(cart));
+    renderProductAvailability();
     if (checkoutButton) {
-      var previewOnly = window.location.hostname.endsWith(".github.io");
-      checkoutButton.disabled = previewOnly || count < 1;
+      checkoutButton.disabled = previewOnly || count < 1 || !isCurrentCartAvailable();
       if (previewOnly) checkoutButton.textContent = "Pedidos disponibles en la versión operativa";
     }
     cartList.replaceChildren();
@@ -103,7 +138,7 @@ import {
         var name = document.createElement("strong");
         name.textContent = product.name;
         var unitPrice = document.createElement("small");
-        unitPrice.textContent = formatARS(product.price) + " por unidad";
+        unitPrice.textContent = formatARS(catalogPrices[product.id]) + " por unidad";
         info.append(name, unitPrice);
 
         var controls = document.createElement("div");
@@ -126,13 +161,16 @@ import {
         increase.setAttribute("aria-label", "Agregar una unidad de " + product.name);
         increase.dataset.cartAction = "increase";
         increase.dataset.productId = product.id;
-        increase.disabled = combinedCount >= 5;
+        increase.disabled = combinedCount >= 5 || (!previewOnly && (
+          !catalogConfigured || !stockConfigured || !catalogEnabled[product.id] ||
+          stockRemaining[product.id] <= quantity
+        ));
 
         controls.append(decrease, quantityLabel, increase);
 
         var lineTotal = document.createElement("strong");
         lineTotal.className = "cart-item-total";
-        lineTotal.textContent = formatARS(product.price * quantity);
+        lineTotal.textContent = formatARS(catalogPrices[product.id] * quantity);
 
         row.append(info, controls, lineTotal);
         cartList.appendChild(row);
@@ -140,16 +178,51 @@ import {
     }
 
     document.querySelectorAll("[data-add-product]").forEach(function (button) {
-      button.disabled = combinedCount >= 5;
-      button.classList.toggle("button-disabled", combinedCount >= 5);
+      var productId = button.dataset.addProduct;
+      var unavailable = !previewOnly && (
+        !catalogConfigured || !stockConfigured || !catalogEnabled[productId] ||
+        stockRemaining[productId] <= Number(cart[productId] || 0)
+      );
+      var disabled = combinedCount >= 5 || unavailable;
+      button.disabled = disabled;
+      button.classList.toggle("button-disabled", disabled);
       button.textContent = combinedCount >= 5 ? "Límite diario alcanzado" :
-        (button.dataset.addProduct === "bizcochos" ? "Agregar bizcochos" : "Agregar facturas");
+        (!catalogConfigured && !previewOnly) ? "Catálogo pendiente" :
+        (!stockConfigured && !previewOnly) ? "Stock pendiente" :
+        (!catalogEnabled[productId] && !previewOnly) ? "No disponible" :
+        (stockRemaining[productId] <= Number(cart[productId] || 0) && !previewOnly) ? "Sin stock" :
+        (productId === "bizcochos" ? "Agregar bizcochos" : "Agregar facturas");
     });
 
     document.dispatchEvent(new CustomEvent("b411:cart-updated", {
-      detail: { cart: { ...cart }, count: count, total: calculateCartTotal(cart) }
+      detail: { cart: { ...cart }, count: count, total: calculateCurrentTotal(cart) }
     }));
   }
+
+  document.addEventListener("b411:catalog-config", function (event) {
+    var detail = event.detail || {};
+    catalogConfigured = detail.configured === true;
+    if (detail.products) {
+      Object.keys(catalogPrices).forEach(function (productId) {
+        var product = detail.products[productId] || {};
+        if (Number.isSafeInteger(product.price) && product.price > 0) catalogPrices[productId] = product.price;
+        catalogEnabled[productId] = product.active === true;
+      });
+    }
+    renderCart();
+  });
+
+  document.addEventListener("b411:stock-update", function (event) {
+    var detail = event.detail || {};
+    stockConfigured = detail.configured === true;
+    if (detail.remaining) {
+      Object.keys(stockRemaining).forEach(function (productId) {
+        var value = Number(detail.remaining[productId]);
+        stockRemaining[productId] = Number.isSafeInteger(value) && value >= 0 ? value : 0;
+      });
+    }
+    renderCart();
+  });
 
   document.addEventListener("b411:daily-total", function (event) {
     bookedQuantity = Math.max(0, Math.min(5, Number(event.detail.quantity || 0)));
@@ -165,7 +238,14 @@ import {
   document.querySelectorAll("[data-add-product]").forEach(function (button) {
     button.addEventListener("click", function () {
       try {
-        var candidate = addProductToCart(cart, button.dataset.addProduct, 1);
+        var productId = button.dataset.addProduct;
+        if (!previewOnly && (!catalogConfigured || !stockConfigured || !catalogEnabled[productId])) {
+          throw new RangeError("Este producto todavía no está disponible para encargar.");
+        }
+        if (!previewOnly && Number(cart[productId] || 0) >= stockRemaining[productId]) {
+          throw new RangeError("No quedan más unidades disponibles de este producto.");
+        }
+        var candidate = addProductToCart(cart, productId, 1);
         if (bookedQuantity + countCartUnits(candidate) > 5) {
           throw new RangeError("Ya usaste parte del límite diario. Te quedan " + Math.max(0, 5 - bookedQuantity) + " unidad(es).");
         }
@@ -185,6 +265,12 @@ import {
       var productId = button.dataset.productId;
       try {
         if (button.dataset.cartAction === "increase") {
+          if (!previewOnly && (!catalogConfigured || !stockConfigured || !catalogEnabled[productId])) {
+            throw new RangeError("Este producto todavía no está disponible para encargar.");
+          }
+          if (!previewOnly && Number(cart[productId] || 0) >= stockRemaining[productId]) {
+            throw new RangeError("No quedan más unidades disponibles de este producto.");
+          }
           var candidate = addProductToCart(cart, productId, 1);
           if (bookedQuantity + countCartUnits(candidate) > 5) {
             throw new RangeError("Ya usaste parte del límite diario. Te quedan " + Math.max(0, 5 - bookedQuantity) + " unidad(es).");

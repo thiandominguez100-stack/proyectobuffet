@@ -24,11 +24,24 @@ Perfil mínimo de usuario:
 - `displayName`: nombre elegido/validado para el uso escolar.
 - `course`: curso.
 - `division`: división.
+- `registrationCodeId`: identificador del código de inscripción consumido; no contiene información del alumno.
 - `role`: `student`, `staff` o `admin`.
 - `active`: cuenta habilitada o suspendida.
 - `createdAt`, `updatedAt`: marcas de tiempo del servidor.
 
 Los alumnos solo podrán crear y modificar campos de perfil permitidos. Nunca podrán asignarse a sí mismos los roles `staff` o `admin`, ni reactivar su propia cuenta.
+
+### `enrollmentCodes/{codeId}`
+
+Código individual de inscripción. El ID es una cadena aleatoria de 16 caracteres del alfabeto `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
+
+- Disponible: `status: available`, `createdAt`, `createdBy`.
+- Consumido: `status: used`, `usedBy`, `usedAt`.
+- Revocado por administración: `status: revoked`, `revokedBy`, `revokedAt`.
+- Solo administración puede crear, enumerar y revocar códigos.
+- Un alumno autenticado puede consultar un código disponible que conoce; no puede enumerar la colección.
+- El código pasa a `used` en la misma transacción que crea `users/{uid}`. Las reglas exigen ambas escrituras; ninguna puede ocurrir por separado.
+- No se guarda nombre, DNI, correo ni curso del alumno en el documento del código.
 
 ### `profilePhotos/{uid}`
 

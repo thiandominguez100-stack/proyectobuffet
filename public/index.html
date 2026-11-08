@@ -64,13 +64,13 @@
             <label for="student-register-name">Nombre para mostrar</label>
             <input id="student-register-name" name="displayName" type="text" minlength="2" maxlength="32" autocomplete="nickname" placeholder="Cómo querés aparecer" required>
           </div>
-          <div>
-            <label for="student-register-course">Curso</label>
-            <input id="student-register-course" name="course" type="text" maxlength="12" placeholder="Ej. 3°" required>
+          <div class="student-form-wide">
+            <p class="student-form-note">Tu curso y división se asignan automáticamente según el código de inscripción entregado por administración.</p>
           </div>
-          <div>
-            <label for="student-register-division">División</label>
-            <input id="student-register-division" name="division" type="text" maxlength="8" placeholder="Ej. A" required>
+          <div class="student-form-wide">
+            <label for="student-register-code">Código único de inscripción</label>
+            <input id="student-register-code" name="registrationCode" type="text" minlength="16" maxlength="16" pattern="[A-HJ-NP-Z2-9]{16}" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Código entregado por el buffet" required>
+            <small class="student-form-note">Solicitá tu código al personal del buffet. Cada código se puede usar una sola vez.</small>
           </div>
           <div class="student-form-wide">
             <label for="student-register-email">Correo electrónico</label>
@@ -138,7 +138,7 @@
           <div class="product-visual visual-bizcochos"><span class="visual-label">FOTO DEL PRODUCTO</span><div class="food-shape biscuit-shape" aria-hidden="true"></div></div>
           <div class="product-info">
             <div class="product-title-line"><div><span class="product-category">PANIFICADOS</span><h3>Bizcochos</h3></div><span class="availability-dot" aria-label="Disponibilidad pendiente"></span></div>
-            <div class="product-bottom"><strong class="price">$500</strong><span class="status-soft">Disponibilidad al abrir pedidos</span></div>
+            <div class="product-bottom"><strong class="price" data-product-price="bizcochos">$500</strong><span class="status-soft" data-product-availability="bizcochos">Consultando stock…</span></div>
             <button class="button button-outline" type="button" data-add-product="bizcochos">Agregar bizcochos</button>
           </div>
         </article>
@@ -146,7 +146,7 @@
           <div class="product-visual visual-facturas"><span class="visual-label">FOTO DEL PRODUCTO</span><div class="food-shape pastry-shape" aria-hidden="true"></div></div>
           <div class="product-info">
             <div class="product-title-line"><div><span class="product-category">PANIFICADOS</span><h3>Facturas</h3></div><span class="availability-dot" aria-label="Disponibilidad pendiente"></span></div>
-            <div class="product-bottom"><strong class="price">$1.000</strong><span class="status-soft">Disponibilidad al abrir pedidos</span></div>
+            <div class="product-bottom"><strong class="price" data-product-price="facturas">$1.000</strong><span class="status-soft" data-product-availability="facturas">Consultando stock…</span></div>
             <button class="button button-outline" type="button" data-add-product="facturas">Agregar facturas</button>
           </div>
         </article>

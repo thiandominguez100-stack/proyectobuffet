@@ -1,4 +1,5 @@
-if (location.hostname.endsWith(".github.io")) {
+const isLocalEmulator = ["localhost", "127.0.0.1"].includes(location.hostname);
+if (location.hostname !== "buffet411-f80af.web.app" && !isLocalEmulator) {
   // GitHub Pages shows the layout only; staff credentials and Firestore remain untouched.
   const authPanel = document.querySelector("#staff-auth");
   const dashboard = document.querySelector("#staff-dashboard");
@@ -13,15 +14,20 @@ if (location.hostname.endsWith(".github.io")) {
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js");
   const {
     collection,
+    deleteDoc,
     doc,
     getDoc,
     onSnapshot,
     query,
+    runTransaction,
     serverTimestamp,
+    setDoc,
+    writeBatch,
     updateDoc,
     where
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
   const { formatARS, getNextSchoolDate, getDateNumber } = await import("./domain.js");
+  const { generateEnrollmentCodes } = await import("./enrollment.js");
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#staff-login-form");
@@ -36,7 +42,14 @@ const enterPanelButton = $("#staff-enter-panel");
 const logoutButton = $("#staff-logout");
 
 let currentAuthorizedUid = null;
+let currentAuthorizedRole = null;
 let stopOrdersListener = null;
+let stopEnrollmentCodesListener = null;
+let stopSchoolDaysListener = null;
+let stopCatalogListener = null;
+let stopAvailabilityListener = null;
+let schoolDayEntries = [];
+let activeStaffServiceDateNumber = null;
 let orderActionsBusy = new Set();
 const ORDERS_PAGE_SIZE = 25;
 let allOrders = [];
@@ -50,7 +63,19 @@ function showMessage(text, kind = "") {
 
 function stopStaffOrders() {
   if (stopOrdersListener) stopOrdersListener();
+  if (stopEnrollmentCodesListener) stopEnrollmentCodesListener();
+  if (stopSchoolDaysListener) stopSchoolDaysListener();
+  if (stopCatalogListener) stopCatalogListener();
+  if (stopAvailabilityListener) stopAvailabilityListener();
   stopOrdersListener = null;
+  stopEnrollmentCodesListener = null;
+  stopSchoolDaysListener = null;
+  stopCatalogListener = null;
+  stopAvailabilityListener = null;
+  schoolDayEntries = [];
+  activeStaffServiceDateNumber = null;
+  $("#staff-enrollment-tools").hidden = true;
+  $("#staff-calendar-form").hidden = true;
   orderActionsBusy = new Set();
   allOrders = [];
   currentPage = 1;
@@ -59,6 +84,7 @@ function stopStaffOrders() {
 function showLogin(text = "Solo pueden ingresar cuentas con rol de personal o administrador.", kind = "") {
   stopStaffOrders();
   currentAuthorizedUid = null;
+  currentAuthorizedRole = null;
   dashboard.hidden = true;
   authPanel.hidden = false;
   form.hidden = false;
@@ -67,21 +93,215 @@ function showLogin(text = "Solo pueden ingresar cuentas con rol de personal o ad
   showMessage(text, kind);
 }
 
-function showAuthorizedStep(user) {
+function showAuthorizedStep(user, role) {
   stopStaffOrders();
   currentAuthorizedUid = user.uid;
+  currentAuthorizedRole = role;
   dashboard.hidden = true;
   authPanel.hidden = false;
   form.hidden = true;
   authorizedStep.hidden = false;
-  showMessage("Acceso autorizado. Tu cuenta está verificada.", "success");
+  showMessage("Permisos confirmados. Tu cuenta está autorizada para el área de personal.", "success");
 }
 
 async function checkStaffRole(user) {
   const roleSnapshot = await getDoc(doc(db, "staffRoles", user.uid));
-  if (!roleSnapshot.exists()) return false;
+  if (!roleSnapshot.exists()) return null;
   const role = roleSnapshot.data().role;
-  return role === "staff" || role === "admin";
+  return role === "staff" || role === "admin" ? role : null;
+}
+
+
+function renderEnrollmentCodes(snapshot) {
+  const list = $("#staff-enrollment-code-list");
+  list.replaceChildren();
+  const codes = snapshot.docs
+    .map((item) => ({ code: item.id, course: item.data().course || "Curso", division: item.data().division || "División" }))
+    .sort((a, b) => a.course.localeCompare(b.course, "es", { numeric: true }) || a.division.localeCompare(b.division, "es"));
+  if (!codes.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state compact";
+    empty.textContent = "No hay códigos disponibles.";
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const entry of codes) {
+    const code = entry.code;
+    const row = document.createElement("div");
+    row.className = "staff-enrollment-row";
+    const details = document.createElement("div");
+    details.className = "staff-enrollment-code-details";
+    const value = document.createElement("code");
+    value.textContent = code;
+    const placement = document.createElement("small");
+    placement.textContent = entry.course + " · División " + entry.division;
+    details.append(value, placement);
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "button button-outline";
+    copy.textContent = "Copiar";
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(code);
+        $("#staff-enrollment-feedback").textContent = "Código copiado. Entregalo solamente al alumno correspondiente.";
+      } catch (error) {
+        $("#staff-enrollment-feedback").textContent = "No se pudo copiar automáticamente. Seleccioná el código y copialo manualmente.";
+      }
+    });
+    const revoke = document.createElement("button");
+    revoke.type = "button";
+    revoke.className = "button button-quiet";
+    revoke.textContent = "Revocar";
+    revoke.addEventListener("click", async () => {
+      if (!window.confirm("¿Revocar este código? Después no podrá utilizarse.")) return;
+      revoke.disabled = true;
+      try {
+        await updateDoc(doc(db, "enrollmentCodes", code), {
+          status: "revoked",
+          revokedAt: serverTimestamp(),
+          revokedBy: auth.currentUser.uid
+        });
+        $("#staff-enrollment-feedback").textContent = "Código revocado.";
+      } catch (error) {
+        console.error("No se pudo revocar el código:", error);
+        $("#staff-enrollment-feedback").textContent = "No se pudo revocar el código. Volvé a intentarlo.";
+        revoke.disabled = false;
+      }
+    });
+    row.append(details, copy, revoke);
+    list.appendChild(row);
+  }
+}
+
+function escapeCsvCell(value) {
+  const text = String(value ?? "");
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+
+function downloadEnrollmentCodesCsv(codes, course, division) {
+  if (!Array.isArray(codes) || !codes.length) {
+    throw new Error("No hay códigos guardados para descargar.");
+  }
+  const newline = String.fromCharCode(13, 10);
+  const rows = [
+    ["Código de inscripción", "Curso", "División"].map(escapeCsvCell).join(","),
+    ...codes.map((code) => [code, course, division].map(escapeCsvCell).join(","))
+  ];
+  const csv = "\uFEFF" + rows.join(newline) + newline;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const safeCourse = course.toLocaleLowerCase("es").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "curso";
+  const safeDivision = division.toLocaleLowerCase("es").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "division";
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "buffet411-codigos-" + safeCourse + "-" + safeDivision + ".csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function startEnrollmentCodeManager(user) {
+  const section = $("#staff-enrollment-tools");
+  if (currentAuthorizedRole !== "admin") {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  if (stopEnrollmentCodesListener) stopEnrollmentCodesListener();
+
+  const codesQuery = query(
+    collection(db, "enrollmentCodes"),
+    where("status", "==", "available")
+  );
+  stopEnrollmentCodesListener = onSnapshot(codesQuery, renderEnrollmentCodes, (error) => {
+    console.error("No se pudieron consultar los códigos:", error);
+    $("#staff-enrollment-feedback").textContent = error.code === "permission-denied"
+      ? "Tu cuenta no tiene permiso para administrar códigos."
+      : "No se pudieron cargar los códigos disponibles.";
+  });
+
+  const createButton = $("#staff-enrollment-create");
+  const quantityInput = $("#staff-enrollment-quantity");
+  const courseInput = $("#staff-enrollment-course");
+  const divisionInput = $("#staff-enrollment-division");
+  createButton.onclick = async () => {
+    if (!auth.currentUser || auth.currentUser.uid !== user.uid || currentAuthorizedRole !== "admin") {
+      $("#staff-enrollment-feedback").textContent = "La sesión administrativa ya no está vigente. Volvé a ingresar.";
+      return;
+    }
+
+    const course = courseInput.value.trim();
+    const division = divisionInput.value.trim();
+    if (!course || course.length > 12 || !division || division.length > 8) {
+      $("#staff-enrollment-feedback").textContent = "Ingresá un curso y una división válidos antes de generar los códigos.";
+      courseInput.focus();
+      return;
+    }
+
+    const requestedCount = Number(quantityInput.value);
+    if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 300) {
+      $("#staff-enrollment-feedback").textContent = "Ingresá una cantidad entera entre 1 y 300.";
+      quantityInput.focus();
+      return;
+    }
+
+    createButton.disabled = true;
+    quantityInput.disabled = true;
+    const savedCodes = [];
+    let saveError = null;
+    try {
+      const codes = generateEnrollmentCodes(requestedCount);
+      const chunkSize = 5;
+      for (let offset = 0; offset < codes.length; offset += chunkSize) {
+        const chunk = codes.slice(offset, offset + chunkSize);
+        const batch = writeBatch(db);
+        for (const code of chunk) {
+          batch.set(doc(db, "enrollmentCodes", code), {
+            status: "available",
+            createdAt: serverTimestamp(),
+            createdBy: user.uid,
+            course,
+            division
+          });
+        }
+        await batch.commit();
+        savedCodes.push(...chunk);
+        $("#staff-enrollment-feedback").textContent =
+          "Guardados " + savedCodes.length + " de " + requestedCount + " códigos…";
+      }
+    } catch (error) {
+      saveError = error;
+      console.error("No se pudo completar el lote de códigos:", error);
+    } finally {
+      createButton.disabled = false;
+      quantityInput.disabled = false;
+    }
+
+    if (savedCodes.length) {
+      try {
+        downloadEnrollmentCodesCsv(savedCodes, course, division);
+      } catch (downloadError) {
+        console.error("No se pudo descargar el CSV:", downloadError);
+        $("#staff-enrollment-feedback").textContent =
+          "Se guardaron " + savedCodes.length + " códigos, pero no se pudo descargar el CSV. Podés copiarlos desde la lista.";
+        return;
+      }
+    }
+
+    if (saveError) {
+      $("#staff-enrollment-feedback").textContent = savedCodes.length
+        ? "Se guardaron y descargaron " + savedCodes.length + " de " + requestedCount + " códigos. El resto no se creó; revisá permisos y volvé a intentarlo con otra cantidad."
+        : saveError.code === "permission-denied"
+          ? "Firebase rechazó la creación. Verificá que tu cuenta sea administradora y que las reglas estén actualizadas."
+          : saveError.message || "No se pudo crear el lote. Intentá nuevamente.";
+      return;
+    }
+
+    $("#staff-enrollment-feedback").textContent =
+      "Listo: se guardaron " + savedCodes.length + " códigos y se descargó el CSV. Entregá uno a cada alumno y no compartas la lista públicamente.";
+  };
 }
 
 function dateLabel(dateKey) {
@@ -104,10 +324,46 @@ function createActionButton(label, action, orderId, kind = "") {
     orderActionsBusy.add(key);
     button.disabled = true;
     try {
-      const patch = { updatedAt: serverTimestamp() };
-      if (action.key === "payment") patch.paymentStatus = "paid";
-      else patch.status = action.key;
-      await updateDoc(doc(db, "orders", orderId), patch);
+      const orderRef = doc(db, "orders", orderId);
+      if (action.key === "payment") {
+        await updateDoc(orderRef, {
+          paymentStatus: "paid",
+          updatedAt: serverTimestamp()
+        });
+      } else if (action.key === "cancelled") {
+        await runTransaction(db, async (transaction) => {
+          const orderSnapshot = await transaction.get(orderRef);
+          if (!orderSnapshot.exists()) throw new Error("El pedido ya no existe.");
+          const order = orderSnapshot.data();
+          if (!["pending", "accepted"].includes(order.status)) {
+            throw new Error("El estado del pedido cambió. Actualizá la lista.");
+          }
+
+          const availabilityRef = doc(db, "dailyAvailability", String(order.serviceDateNumber));
+          const stockSnapshot = await transaction.get(availabilityRef);
+          transaction.update(orderRef, {
+            status: "cancelled",
+            updatedAt: serverTimestamp()
+          });
+
+          if (stockSnapshot.exists()) {
+            const stock = stockSnapshot.data();
+            transaction.update(availabilityRef, {
+              bizcochosRemaining: Number(stock.bizcochosRemaining || 0) + Number(order.items?.bizcochos || 0),
+              facturasRemaining: Number(stock.facturasRemaining || 0) + Number(order.items?.facturas || 0),
+              updatedAt: serverTimestamp(),
+              updatedBy: auth.currentUser.uid,
+              lastOrderId: orderId,
+              lastAction: "released"
+            });
+          }
+        });
+      } else {
+        await updateDoc(orderRef, {
+          status: action.key,
+          updatedAt: serverTimestamp()
+        });
+      }
     } catch (error) {
       console.error("No se pudo actualizar el pedido:", error);
       const status = $("#staff-orders-status");
@@ -201,11 +457,13 @@ function getFilteredStaffOrders(orders) {
   const search = normalizeOrderSearch($("#staff-orders-search").value);
   const slot = $("#staff-orders-slot-filter").value;
   const status = $("#staff-orders-status-filter").value;
+  const payment = $("#staff-orders-payment-filter")?.value || "all";
 
   return orders.filter((order) => {
     if (status === "active" && order.status === "cancelled") return false;
     if (status !== "active" && status !== "all" && order.status !== status) return false;
     if (slot !== "all" && order.pickupSlot !== slot) return false;
+    if (payment !== "all" && order.paymentStatus !== payment) return false;
     if (!search) return true;
 
     const searchableText = normalizeOrderSearch([
@@ -260,6 +518,25 @@ function renderStaffOrders(orders) {
     ? activeOrders.length + " PEDIDO(S) ACTIVOS"
     : "SIN PEDIDOS ACTIVOS";
 
+  const paymentBuckets = {
+    unpaid: { count: 0, total: 0 },
+    pending_review: { count: 0, total: 0 },
+    paid: { count: 0, total: 0 }
+  };
+  for (const order of activeOrders) {
+    const bucket = paymentBuckets[order.paymentStatus];
+    if (bucket) {
+      bucket.count += 1;
+      bucket.total += Number(order.total || 0);
+    }
+  }
+  $("#staff-payment-cash-pending").textContent = formatARS(paymentBuckets.unpaid.total);
+  $("#staff-payment-cash-count").textContent = paymentBuckets.unpaid.count + " pedido(s)";
+  $("#staff-payment-mp-pending").textContent = formatARS(paymentBuckets.pending_review.total);
+  $("#staff-payment-mp-count").textContent = paymentBuckets.pending_review.count + " pedido(s)";
+  $("#staff-payment-paid").textContent = formatARS(paymentBuckets.paid.total);
+  $("#staff-payment-paid-count").textContent = paymentBuckets.paid.count + " pedido(s)";
+
   const sortedOrders = [...orders].sort((a, b) => {
     const courseA = (a.course || "") + (a.division || "") + (a.displayName || "");
     const courseB = (b.course || "") + (b.division || "") + (b.displayName || "");
@@ -299,6 +576,222 @@ function setOrdersConnectionState(state, title, description) {
   $("#staff-notice-text").textContent = description;
 }
 
+function calendarDateKey(value) {
+  const digits = String(value || "").replace(/\D/g, "").padStart(8, "0");
+  if (digits.length !== 8) return "";
+  return digits.slice(0, 4) + "-" + digits.slice(4, 6) + "-" + digits.slice(6, 8);
+}
+
+function getCalendarOptions() {
+  return {
+    openDates: schoolDayEntries.filter((entry) => entry.open).map((entry) => calendarDateKey(entry.dateNumber)),
+    closedDates: schoolDayEntries.filter((entry) => !entry.open).map((entry) => calendarDateKey(entry.dateNumber))
+  };
+}
+
+function getStaffCalendarQuery() {
+  const todayKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Cordoba",
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+  const [year, month, day] = todayKey.split("-").map(Number);
+  const endDate = new Date(Date.UTC(year, month - 1, day + 370));
+  const endKey = endDate.toISOString().slice(0, 10);
+  return query(
+    collection(db, "schoolDays"),
+    where("dateNumber", ">=", getDateNumber(todayKey)),
+    where("dateNumber", "<=", getDateNumber(endKey))
+  );
+}
+
+function renderSchoolCalendar() {
+  const list = $("#staff-calendar-list");
+  if (!list) return;
+  list.replaceChildren();
+
+  const today = getDateNumber(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Cordoba",
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date()));
+  const upcoming = schoolDayEntries
+    .filter((entry) => Number(entry.dateNumber) >= today)
+    .sort((a, b) => Number(a.dateNumber) - Number(b.dateNumber));
+
+  if (!upcoming.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state compact";
+    empty.textContent = "No hay excepciones cargadas. Se usa el calendario habitual de lunes a viernes.";
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const entry of upcoming) {
+    const row = document.createElement("div");
+    row.className = "staff-calendar-row";
+    const details = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = dateLabel(calendarDateKey(entry.dateNumber));
+    const description = document.createElement("small");
+    description.textContent = (entry.open ? "Jornada habilitada" : "Sin clases")
+      + (entry.label ? " · " + entry.label : "");
+    details.append(title, description);
+    const state = document.createElement("span");
+    state.className = entry.open ? "staff-calendar-open" : "staff-calendar-closed";
+    state.textContent = entry.open ? "ABIERTA" : "CERRADA";
+    row.append(details, state);
+
+    if (currentAuthorizedRole === "admin") {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "button button-quiet";
+      remove.textContent = "Quitar excepción";
+      remove.addEventListener("click", async () => {
+        if (!window.confirm("¿Quitar esta excepción y volver al calendario habitual?")) return;
+        remove.disabled = true;
+        try {
+          await deleteDoc(doc(db, "schoolDays", String(entry.dateNumber)));
+          $("#staff-calendar-feedback").textContent = "Se quitó la excepción del calendario.";
+        } catch (error) {
+          console.error("No se pudo quitar la excepción:", error);
+          $("#staff-calendar-feedback").textContent = "No se pudo modificar el calendario. Revisá tus permisos.";
+          remove.disabled = false;
+        }
+      });
+      row.appendChild(remove);
+    }
+    list.appendChild(row);
+  }
+}
+
+function startCatalogSettingsListener() {
+  $("#staff-catalog-form").hidden = currentAuthorizedRole !== "admin";
+  stopCatalogListener = onSnapshot(doc(db, "settings", "catalog"), (snapshot) => {
+    if (!snapshot.exists()) {
+      $("#staff-catalog-state").textContent = "CATÁLOGO PENDIENTE";
+      $("#staff-catalog-feedback").textContent = "Guardá los precios iniciales para habilitar los pedidos. Valores sugeridos: Bizcochos $500 y Facturas $1.000.";
+      $("#staff-price-bizcochos").value = "500";
+      $("#staff-price-facturas").value = "1000";
+      $("#staff-active-bizcochos").checked = true;
+      $("#staff-active-facturas").checked = true;
+      return;
+    }
+
+    const products = snapshot.data().products || {};
+    $("#staff-catalog-state").textContent = "CATÁLOGO ACTIVO";
+    $("#staff-price-bizcochos").value = String(products.bizcochos?.price ?? 500);
+    $("#staff-price-facturas").value = String(products.facturas?.price ?? 1000);
+    $("#staff-active-bizcochos").checked = products.bizcochos?.active === true;
+    $("#staff-active-facturas").checked = products.facturas?.active === true;
+    $("#staff-catalog-feedback").textContent = "Los precios guardados se aplicarán a los pedidos nuevos. Los pedidos existentes conservan su total original.";
+  }, (error) => {
+    console.error("No se pudo cargar el catálogo:", error);
+    $("#staff-catalog-state").textContent = "ERROR DE CATÁLOGO";
+    $("#staff-catalog-feedback").textContent = "No se pudieron leer los precios. Revisá los permisos y la conexión.";
+  });
+}
+
+function listenForDailyAvailability(dateNumber, dateKey) {
+  if (stopAvailabilityListener) stopAvailabilityListener();
+  $("#staff-stock-date").textContent = dateLabel(dateKey);
+  $("#staff-stock-form").hidden = false;
+  stopAvailabilityListener = onSnapshot(doc(db, "dailyAvailability", String(dateNumber)), (snapshot) => {
+    if (!snapshot.exists()) {
+      $("#staff-stock-bizcochos").value = "0";
+      $("#staff-stock-facturas").value = "0";
+      $("#staff-stock-feedback").textContent = "Todavía no se cargó el stock para esta jornada. Ingresá las unidades disponibles.";
+      return;
+    }
+    const stock = snapshot.data();
+    $("#staff-stock-bizcochos").value = String(stock.bizcochosRemaining);
+    $("#staff-stock-facturas").value = String(stock.facturasRemaining);
+    $("#staff-stock-feedback").textContent = "Stock actualizado en vivo. Los pedidos lo descuentan automáticamente y las cancelaciones lo restituyen.";
+  }, (error) => {
+    console.error("No se pudo consultar el stock diario:", error);
+    $("#staff-stock-feedback").textContent = "No se pudo consultar el stock. Revisá la conexión y los permisos.";
+  });
+}
+
+$("#staff-catalog-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const feedback = $("#staff-catalog-feedback");
+  if (currentAuthorizedRole !== "admin" || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+    feedback.textContent = "Solo administración puede modificar precios y disponibilidad del catálogo.";
+    return;
+  }
+
+  const bizcochosPrice = Number($("#staff-price-bizcochos").value);
+  const facturasPrice = Number($("#staff-price-facturas").value);
+  if (!Number.isSafeInteger(bizcochosPrice) || bizcochosPrice < 1 || bizcochosPrice > 100000 ||
+      !Number.isSafeInteger(facturasPrice) || facturasPrice < 1 || facturasPrice > 100000) {
+    feedback.textContent = "Los precios deben ser números enteros entre $1 y $100.000.";
+    return;
+  }
+
+  const button = $("#staff-catalog-save");
+  button.disabled = true;
+  feedback.textContent = "Guardando catálogo…";
+  try {
+    await setDoc(doc(db, "settings", "catalog"), {
+      products: {
+        bizcochos: { price: bizcochosPrice, active: $("#staff-active-bizcochos").checked },
+        facturas: { price: facturasPrice, active: $("#staff-active-facturas").checked }
+      },
+      updatedAt: serverTimestamp(),
+      updatedBy: currentAuthorizedUid
+    });
+    feedback.textContent = "Catálogo guardado. Los alumnos ya verán los precios y productos actualizados.";
+  } catch (error) {
+    console.error("No se pudo guardar el catálogo:", error);
+    feedback.textContent = error.code === "permission-denied"
+      ? "Firebase rechazó el cambio. Confirmá que tu cuenta sea administradora."
+      : "No se pudo guardar el catálogo. Intentá nuevamente.";
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#staff-stock-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const feedback = $("#staff-stock-feedback");
+  if (!["staff", "admin"].includes(currentAuthorizedRole) ||
+      !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid ||
+      !activeStaffServiceDateNumber) {
+    feedback.textContent = "Volvé a ingresar con una cuenta autorizada para administrar stock.";
+    return;
+  }
+
+  const bizcochosRemaining = Number($("#staff-stock-bizcochos").value);
+  const facturasRemaining = Number($("#staff-stock-facturas").value);
+  if (!Number.isSafeInteger(bizcochosRemaining) || bizcochosRemaining < 0 || bizcochosRemaining > 5000 ||
+      !Number.isSafeInteger(facturasRemaining) || facturasRemaining < 0 || facturasRemaining > 5000) {
+    feedback.textContent = "El stock debe ser un número entero entre 0 y 5.000 unidades.";
+    return;
+  }
+
+  const button = $("#staff-stock-save");
+  button.disabled = true;
+  feedback.textContent = "Guardando stock…";
+  try {
+    await setDoc(doc(db, "dailyAvailability", String(activeStaffServiceDateNumber)), {
+      dateNumber: activeStaffServiceDateNumber,
+      bizcochosRemaining,
+      facturasRemaining,
+      updatedAt: serverTimestamp(),
+      updatedBy: currentAuthorizedUid,
+      lastOrderId: "",
+      lastAction: "configured"
+    });
+    feedback.textContent = "Stock guardado para la próxima jornada.";
+  } catch (error) {
+    console.error("No se pudo guardar el stock:", error);
+    feedback.textContent = error.code === "permission-denied"
+      ? "Firebase rechazó el cambio. Revisá tu rol y las reglas de stock."
+      : "No se pudo guardar el stock. Intentá nuevamente.";
+  } finally {
+    button.disabled = false;
+  }
+});
+
 function startStaffOrders() {
   stopStaffOrders();
   setOrdersConnectionState(
@@ -306,49 +799,128 @@ function startStaffOrders() {
     "Comprobando conexión",
     "Estamos consultando Firestore para verificar el acceso a los pedidos."
   );
-  const dateKey = getNextSchoolDate(new Date());
-  const number = getDateNumber(dateKey);
-  $("#staff-next-date").textContent = dateLabel(dateKey);
   $("#staff-orders-status").textContent = "CARGANDO…";
+  $("#staff-calendar-form").hidden = currentAuthorizedRole !== "admin";
+  $("#staff-stock-form").hidden = false;
+  startCatalogSettingsListener();
 
-  const ordersQuery = query(
-    collection(db, "orders"),
-    where("serviceDateNumber", "==", number)
-  );
-  stopOrdersListener = onSnapshot(ordersQuery, { includeMetadataChanges: true }, (snapshot) => {
-    if (snapshot.metadata.fromCache) {
-      setOrdersConnectionState(
-        "DATOS EN CACHÉ",
-        "Mostrando datos guardados",
-        "Todavía no se confirmó la conexión con Firestore. Los datos pueden estar desactualizados."
-      );
-    } else {
-      setOrdersConnectionState(
-        "PEDIDOS EN VIVO",
-        "Pedidos conectados",
-        "La conexión con Firestore está confirmada. Los pedidos y sus estados se actualizan en tiempo real. La administración de stock y calendario se incorporará en la siguiente etapa."
-      );
+  stopSchoolDaysListener = onSnapshot(getStaffCalendarQuery(), (calendarSnapshot) => {
+    schoolDayEntries = calendarSnapshot.docs.map((item) => ({
+      id: item.id,
+      ...item.data(),
+      dateNumber: Number(item.data().dateNumber || item.id)
+    }));
+    renderSchoolCalendar();
+
+    let dateKey;
+    try {
+      dateKey = getNextSchoolDate(new Date(), { ...getCalendarOptions(), maxDays: 7 });
+    } catch (error) {
+      setOrdersConnectionState("ERROR DE CALENDARIO", "No encontramos una jornada", "Revisá las excepciones del calendario escolar.");
+      $("#staff-orders-status").textContent = "ERROR DE CALENDARIO";
+      return;
     }
-    allOrders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-    renderStaffOrders(allOrders);
-  }, (error) => {
-    console.error("No se pudieron cargar los pedidos del buffet:", error);
-    const permissionDenied = error.code === "permission-denied";
-    setOrdersConnectionState(
-      permissionDenied ? "SIN PERMISO" : "ERROR DE CONEXIÓN",
-      permissionDenied ? "Firestore rechazó el acceso" : "No se pudo conectar",
-      permissionDenied
-        ? "La cuenta inició sesión, pero las reglas de Firestore no permiten consultar los pedidos. Hay que revisar y publicar las reglas de pedidos."
-        : "No pudimos consultar los pedidos. Comprobá la conexión a internet e intentá nuevamente."
+
+    const number = getDateNumber(dateKey);
+    $("#staff-next-date").textContent = dateLabel(dateKey);
+    if (number === activeStaffServiceDateNumber && stopOrdersListener) return;
+    activeStaffServiceDateNumber = number;
+    listenForDailyAvailability(number, dateKey);
+    if (stopOrdersListener) stopOrdersListener();
+
+    const ordersQuery = query(
+      collection(db, "orders"),
+      where("serviceDateNumber", "==", number)
     );
-    $("#staff-orders-status").textContent = permissionDenied
-      ? "ACCESO DENEGADO"
-      : "ERROR DE CONEXIÓN";
-    $("#staff-orders-list").textContent = permissionDenied
-      ? "La cuenta está autorizada para entrar, pero Firestore no permite leer los pedidos. Revisá las reglas."
-      : "No se pudieron consultar los pedidos. Revisá la conexión e intentá nuevamente.";
+    stopOrdersListener = onSnapshot(ordersQuery, { includeMetadataChanges: true }, (snapshot) => {
+      if (snapshot.metadata.fromCache) {
+        setOrdersConnectionState(
+          "DATOS EN CACHÉ",
+          "Mostrando datos guardados",
+          "Todavía no se confirmó la conexión con Firestore. Los datos pueden estar desactualizados."
+        );
+      } else {
+        setOrdersConnectionState(
+          "PEDIDOS EN VIVO",
+          "Pedidos conectados",
+          "La conexión con Firestore está confirmada. Los pedidos y sus estados se actualizan en tiempo real."
+        );
+      }
+      allOrders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      renderStaffOrders(allOrders);
+    }, (error) => {
+      console.error("No se pudieron cargar los pedidos del buffet:", error);
+      const permissionDenied = error.code === "permission-denied";
+      setOrdersConnectionState(
+        permissionDenied ? "SIN PERMISO" : "ERROR DE CONEXIÓN",
+        permissionDenied ? "Firestore rechazó el acceso" : "No se pudo conectar",
+        permissionDenied
+          ? "La cuenta inició sesión, pero Firestore no permite consultar los pedidos. Hay que revisar las reglas."
+          : "No pudimos consultar los pedidos. Comprobá la conexión a internet e intentá nuevamente."
+      );
+      $("#staff-orders-status").textContent = permissionDenied ? "ACCESO DENEGADO" : "ERROR DE CONEXIÓN";
+      $("#staff-orders-list").textContent = permissionDenied
+        ? "La cuenta está autorizada para entrar, pero Firestore no permite leer los pedidos. Revisá las reglas."
+        : "No se pudieron consultar los pedidos. Revisá la conexión e intentá nuevamente.";
+    });
+  }, (error) => {
+    console.error("No se pudo cargar el calendario escolar:", error);
+    setOrdersConnectionState(
+      error.code === "permission-denied" ? "SIN PERMISO" : "ERROR DE CALENDARIO",
+      "No se pudo consultar el calendario",
+      "Revisá la conexión y los permisos de lectura del calendario escolar."
+    );
+    $("#staff-orders-status").textContent = "ERROR DE CALENDARIO";
   });
 }
+
+$("#staff-calendar-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const feedback = $("#staff-calendar-feedback");
+  if (currentAuthorizedRole !== "admin" || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+    feedback.textContent = "Solo administración puede modificar el calendario.";
+    return;
+  }
+
+  const dateKey = $("#staff-calendar-date").value;
+  const label = $("#staff-calendar-label").value.trim();
+  const dateNumber = getDateNumber(dateKey);
+  const openDate = new Date(dateKey + "T12:00:00Z");
+  const selectedAsOpen = $("#staff-calendar-open").value === "true";
+  const isWeekend = openDate.getUTCDay() === 0 || openDate.getUTCDay() === 6;
+  const today = getDateNumber(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Cordoba",
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date()));
+  if (!dateKey || !Number.isFinite(openDate.getTime()) || dateNumber <= today ||
+      label.length > 80 || (selectedAsOpen && isWeekend)) {
+    feedback.textContent = selectedAsOpen && isWeekend
+      ? "Las jornadas especiales deben programarse de lunes a viernes."
+      : "Elegí una fecha futura y una descripción de hasta 80 caracteres.";
+    return;
+  }
+
+  const button = $("#staff-calendar-save");
+  button.disabled = true;
+  feedback.textContent = "Guardando excepción…";
+  try {
+    await setDoc(doc(db, "schoolDays", String(dateNumber)), {
+      dateNumber,
+      open: $("#staff-calendar-open").value === "true",
+      label,
+      updatedAt: serverTimestamp()
+    });
+    $("#staff-calendar-label").value = "";
+    feedback.textContent = "Calendario actualizado. La próxima jornada se recalculó automáticamente.";
+  } catch (error) {
+    console.error("No se pudo guardar el calendario:", error);
+    feedback.textContent = error.code === "permission-denied"
+      ? "Firebase rechazó el cambio. Confirmá que ingresaste con una cuenta administradora."
+      : "No se pudo guardar la fecha. Revisá la conexión e intentá nuevamente.";
+  } finally {
+    button.disabled = false;
+  }
+});
 
 
 $("#staff-orders-search").addEventListener("input", () => {
@@ -364,6 +936,20 @@ $("#staff-orders-slot-filter").addEventListener("change", () => {
 $("#staff-orders-status-filter").addEventListener("change", () => {
   currentPage = 1;
   renderStaffOrders(allOrders);
+});
+
+$("#staff-orders-payment-filter").addEventListener("change", () => {
+  currentPage = 1;
+  renderStaffOrders(allOrders);
+});
+
+document.querySelectorAll("[data-payment-filter]").forEach((button) => {
+  button.addEventListener("click", () => {
+    $("#staff-orders-payment-filter").value = button.dataset.paymentFilter;
+    currentPage = 1;
+    renderStaffOrders(allOrders);
+    $("#pedidos").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 });
 
 $("#staff-orders-page-prev").addEventListener("click", () => {
@@ -386,13 +972,13 @@ form.addEventListener("submit", async (event) => {
       emailInput.value.trim(),
       passwordInput.value
     );
-    const authorized = await checkStaffRole(credential.user);
-    if (!authorized) {
+    const role = await checkStaffRole(credential.user);
+    if (!role) {
       await signOut(auth);
       showLogin("Esta cuenta no tiene permisos para acceder al panel.", "error");
       return;
     }
-    showAuthorizedStep(credential.user);
+    showAuthorizedStep(credential.user, role);
   } catch (error) {
     console.error("Error de acceso del personal:", error);
     const text = error.code === "auth/invalid-credential"
@@ -411,14 +997,17 @@ enterPanelButton.addEventListener("click", async () => {
   showMessage("Comprobando permisos nuevamente…");
   try {
     const user = auth.currentUser;
-    if (!user || user.uid !== currentAuthorizedUid || !(await checkStaffRole(user))) {
+    const role = user && user.uid === currentAuthorizedUid ? await checkStaffRole(user) : null;
+    if (!user || !role) {
       await signOut(auth);
       showLogin("Tu autorización ya no está vigente. Iniciá sesión nuevamente.", "error");
       return;
     }
+    currentAuthorizedRole = role;
     authPanel.hidden = true;
     dashboard.hidden = false;
     startStaffOrders();
+    if (role === "admin") startEnrollmentCodeManager(user);
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (error) {
     console.error("No se pudieron revalidar los permisos:", error);
@@ -443,9 +1032,9 @@ onAuthStateChanged(auth, async (user) => {
   authPanel.hidden = false;
 
   try {
-    const authorized = await checkStaffRole(user);
-    if (authorized) {
-      showAuthorizedStep(user);
+    const role = await checkStaffRole(user);
+    if (role) {
+      showAuthorizedStep(user, role);
     } else {
       await signOut(auth);
       showLogin("Esta cuenta no tiene permisos para acceder al panel.", "error");

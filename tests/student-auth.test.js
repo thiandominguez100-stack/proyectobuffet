@@ -40,7 +40,7 @@ test("las fotos se guardan aparte y quedan limitadas al propietario", () => {
 test("los pedidos tienen reglas explícitas y las colecciones desconocidas siguen cerradas", () => {
   assert.match(rules, /match \/orders\/\{orderId\}/);
   assert.match(rules, /match \/dailyOrderTotals\/\{totalId\}/);
-  assert.match(rules, /allow list: if isStaff\(\) \|\| \(signedIn\(\) && resource\.data\.uid == request\.auth\.uid\)/);
+  assert.match(rules, /allow list: if signedIn\(\) && resource\.data\.uid == request\.auth\.uid/);
   assert.match(rules, /match \/\{document=\*\*\}/);
   assert.match(rules, /allow read, write: if false/);
 });
@@ -48,7 +48,7 @@ test("los pedidos tienen reglas explícitas y las colecciones desconocidas sigue
 
 test("GitHub Pages muestra solo la demo y no carga autenticación", () => {
   const preview = auth.slice(0, auth.indexOf("} else {"));
-  assert.match(preview, /location\.hostname\.endsWith\("\.github\.io"\)/);
+  assert.match(preview, /location\.hostname !== "buffet411-f80af\.web\.app"/);
   assert.match(preview, /Vista de demostración/);
   assert.doesNotMatch(preview, /signInWithEmailAndPassword|onAuthStateChanged|firebase\.js/);
 });
@@ -66,4 +66,16 @@ test("un fallo temporal al validar el perfil no cierra automáticamente la sesi�
   assert.doesNotMatch(catchBlock, /signOut\(auth\)/);
   assert.match(catchBlock, /Tu sesión sigue abierta/);
   assert.match(auth, /await loadStudentSession\(auth\.currentUser\)/);
+});
+
+
+test("el registro comprueba el perfil antes de borrar una cuenta tras un error de red", () => {
+  const start = auth.indexOf('registerForm.addEventListener("submit"');
+  const end = auth.indexOf('$("#student-forgot-password")', start);
+  const registration = auth.slice(start, end);
+  assert.match(registration, /const existingProfile = await getDoc\(doc\(db, "users", newUser\.uid\)\)/);
+  assert.match(registration, /preserveAccount = existingProfile\.exists\(\)/);
+  assert.match(registration, /if \(!preserveAccount && !existingProfile\.exists\(\)\)/);
+  assert.match(registration, /if \(profileCheckFailed\)/);
+  assert.match(registration, /await sendEmailVerification\(newUser\)/);
 });

@@ -35,3 +35,40 @@ test("los totales de producción se calculan con todos los pedidos activos, no s
   assert.match(staff, /for \(const order of activeOrders\)/);
   assert.match(staff, /const filteredOrders = getFilteredStaffOrders\(sortedOrders\)/);
 });
+
+
+test("el panel calcula saldos por efectivo, Mercado Pago y pagos confirmados", () => {
+  assert.match(page, /id="staff-payment-cash-pending"/);
+  assert.match(page, /id="staff-payment-mp-pending"/);
+  assert.match(page, /id="staff-payment-paid"/);
+  assert.match(staff, /paymentBuckets/);
+  assert.match(staff, /order.paymentStatus !== payment/);
+});
+
+
+test("el calendario permite cargar excepciones y distingue controles administrativos", () => {
+  assert.match(page, /<form id="staff-calendar-form"[^>]*hidden>/);
+  assert.match(page, /id="staff-calendar-date"/);
+  assert.match(page, /id="staff-calendar-open"/);
+  assert.match(staff, /currentAuthorizedRole !== "admin"/);
+  assert.match(staff, /setDoc\(doc\(db, "schoolDays"/);
+  assert.match(staff, /deleteDoc\(doc\(db, "schoolDays"/);
+});
+
+
+test("el personal puede cargar stock y administración puede cambiar precios y activar productos", () => {
+  assert.match(page, /<form id="staff-catalog-form"[^>]*hidden>/);
+  assert.match(page, /id="staff-price-bizcochos"/);
+  assert.match(page, /id="staff-price-facturas"/);
+  assert.match(page, /id="staff-stock-form"/);
+  assert.match(page, /id="staff-stock-bizcochos"/);
+  assert.match(staff, /startCatalogSettingsListener/);
+  assert.match(staff, /listenForDailyAvailability/);
+  assert.match(staff, /currentAuthorizedRole !== "admin"/);
+});
+
+test("cancelar un pedido usa una transacción que devuelve las unidades al stock", () => {
+  assert.match(staff, /action\.key === "cancelled"/);
+  assert.match(staff, /transaction\.update\(availabilityRef/);
+  assert.match(staff, /lastAction: "released"/);
+});

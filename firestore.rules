@@ -35,8 +35,34 @@ service cloud.firestore {
         && request.time.hours() < 20;
     }
 
+    function sameCalendarDate(left, right) {
+      return left.year() == right.year()
+        && left.month() == right.month()
+        && left.date() == right.date();
+    }
+
+    function schoolDateIsOpen(dateAt) {
+      let dayNumber = dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day();
+      let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dayNumber));
+      return dateAt.dayOfWeek() < 6
+        && (!exists(schoolDayPath) || get(schoolDayPath).data.open == true);
+    }
+
+    function schoolDateIsClosed(dateAt) {
+      let dayNumber = dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day();
+      let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dayNumber));
+      return dateAt.dayOfWeek() >= 6
+        || (exists(schoolDayPath) && get(schoolDayPath).data.open == false);
+    }
+
     function validNextSchoolDate(dateAt, dateNumber) {
-      let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dateNumber));
+      let day1 = request.time + duration.value(1, 'd');
+      let day2 = request.time + duration.value(2, 'd');
+      let day3 = request.time + duration.value(3, 'd');
+      let day4 = request.time + duration.value(4, 'd');
+      let day5 = request.time + duration.value(5, 'd');
+      let day6 = request.time + duration.value(6, 'd');
+      let day7 = request.time + duration.value(7, 'd');
       return dateAt is timestamp
         && dateNumber is int
         && dateAt.hours() == 3
@@ -44,26 +70,33 @@ service cloud.firestore {
         && dateAt.seconds() == 0
         && dateAt.nanos() == 0
         && dateNumber == dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day()
-        // Se permite pedir de lunes a viernes y los domingos; sábado queda cerrado.
         && (request.time.dayOfWeek() < 6 || request.time.dayOfWeek() == 7)
         && (
-          // Lunes a jueves: siguiente día calendario.
-          (request.time.dayOfWeek() < 5
-            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
-          ||
-          // Viernes: próxima jornada escolar, el lunes.
-          (request.time.dayOfWeek() == 5
-            && dateAt.date() == request.time.date() + duration.value(3, 'd'))
-          ||
-          // Domingo: próxima jornada escolar, el lunes.
-          (request.time.dayOfWeek() == 7
-            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
-        )
-        && (!exists(schoolDayPath) || get(schoolDayPath).data.open == true);
+          (sameCalendarDate(dateAt, day1) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day2) && schoolDateIsClosed(day1) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day3) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day4) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day5) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day6) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsClosed(day5) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day7) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsClosed(day5) && schoolDateIsClosed(day6) && schoolDateIsOpen(dateAt))
+        );
     }
 
     function validOrderItems(data) {
-      return data.items is map
+      let catalogPath = /databases/$(database)/documents/settings/catalog;
+      return exists(catalogPath)
+        && get(catalogPath).data.products is map
+        && get(catalogPath).data.products.keys().hasOnly(['bizcochos', 'facturas'])
+        && get(catalogPath).data.products.keys().hasAll(['bizcochos', 'facturas'])
+        && get(catalogPath).data.products.bizcochos.price is int
+        && get(catalogPath).data.products.bizcochos.price >= 1
+        && get(catalogPath).data.products.bizcochos.price <= 100000
+        && get(catalogPath).data.products.bizcochos.active is bool
+        && get(catalogPath).data.products.facturas.price is int
+        && get(catalogPath).data.products.facturas.price >= 1
+        && get(catalogPath).data.products.facturas.price <= 100000
+        && get(catalogPath).data.products.facturas.active is bool
+        && data.items is map
         && data.items.keys().hasOnly(['bizcochos', 'facturas'])
         && data.items.keys().hasAll(['bizcochos', 'facturas'])
         && data.items.bizcochos is int
@@ -76,8 +109,62 @@ service cloud.firestore {
         && data.quantity >= 1
         && data.quantity <= 5
         && data.quantity == data.items.bizcochos + data.items.facturas
+        && (data.items.bizcochos == 0 || get(catalogPath).data.products.bizcochos.active == true)
+        && (data.items.facturas == 0 || get(catalogPath).data.products.facturas.active == true)
         && data.total is int
-        && data.total == data.items.bizcochos * 500 + data.items.facturas * 1000;
+        && data.total == data.items.bizcochos * get(catalogPath).data.products.bizcochos.price
+          + data.items.facturas * get(catalogPath).data.products.facturas.price;
+    }
+
+    function hasAtomicAvailability(orderId, data) {
+      let stockPath = /databases/$(database)/documents/dailyAvailability/$(string(data.serviceDateNumber));
+      let oldStock = exists(stockPath) ? get(stockPath).data : {};
+      let newStock = existsAfter(stockPath) ? getAfter(stockPath).data : {};
+      return exists(stockPath)
+        && existsAfter(stockPath)
+        && oldStock.dateNumber == data.serviceDateNumber
+        && oldStock.bizcochosRemaining is int
+        && oldStock.facturasRemaining is int
+        && oldStock.bizcochosRemaining >= data.items.bizcochos
+        && oldStock.facturasRemaining >= data.items.facturas
+        && newStock.dateNumber == data.serviceDateNumber
+        && newStock.bizcochosRemaining == oldStock.bizcochosRemaining - data.items.bizcochos
+        && newStock.facturasRemaining == oldStock.facturasRemaining - data.items.facturas
+        && newStock.lastOrderId == orderId
+        && newStock.lastAction == 'reserved'
+        && newStock.updatedBy == request.auth.uid
+        && newStock.updatedAt == request.time;
+    }
+
+    function stockReservationMatchesOrder(dateNumber, newStock) {
+      let orderPath = /databases/$(database)/documents/orders/$(newStock.lastOrderId);
+      let order = existsAfter(orderPath) ? getAfter(orderPath).data : {};
+      return existsAfter(orderPath)
+        && order.uid == request.auth.uid
+        && order.serviceDateNumber == dateNumber
+        && order.status == 'pending'
+        && order.createdAt == request.time
+        && order.items.bizcochos == resource.data.bizcochosRemaining - newStock.bizcochosRemaining
+        && order.items.facturas == resource.data.facturasRemaining - newStock.facturasRemaining
+        && newStock.lastAction == 'reserved'
+        && newStock.updatedBy == request.auth.uid
+        && newStock.updatedAt == request.time;
+    }
+
+    function stockReleaseMatchesOrder(dateNumber, newStock) {
+      let orderPath = /databases/$(database)/documents/orders/$(newStock.lastOrderId);
+      let previousOrder = exists(orderPath) ? get(orderPath).data : {};
+      let cancelledOrder = existsAfter(orderPath) ? getAfter(orderPath).data : {};
+      return exists(orderPath)
+        && existsAfter(orderPath)
+        && previousOrder.status in ['pending', 'accepted']
+        && cancelledOrder.status == 'cancelled'
+        && cancelledOrder.serviceDateNumber == dateNumber
+        && newStock.bizcochosRemaining == resource.data.bizcochosRemaining + previousOrder.items.bizcochos
+        && newStock.facturasRemaining == resource.data.facturasRemaining + previousOrder.items.facturas
+        && newStock.lastAction == 'released'
+        && newStock.updatedBy == request.auth.uid
+        && newStock.updatedAt == request.time;
     }
 
     function hasAtomicDailyTotal(orderId, data) {
@@ -110,6 +197,22 @@ service cloud.firestore {
         && newTotal.updatedAt == request.time;
     }
 
+    function hasAtomicStockRelease(orderId, oldOrder) {
+      let stockPath = /databases/$(database)/documents/dailyAvailability/$(string(oldOrder.serviceDateNumber));
+      let oldStock = exists(stockPath) ? get(stockPath).data : {};
+      let newStock = existsAfter(stockPath) ? getAfter(stockPath).data : {};
+      return !exists(stockPath) || (
+        existsAfter(stockPath)
+        && newStock.dateNumber == oldOrder.serviceDateNumber
+        && newStock.bizcochosRemaining == oldStock.bizcochosRemaining + oldOrder.items.bizcochos
+        && newStock.facturasRemaining == oldStock.facturasRemaining + oldOrder.items.facturas
+        && newStock.lastOrderId == orderId
+        && newStock.lastAction == 'released'
+        && newStock.updatedBy == request.auth.uid
+        && newStock.updatedAt == request.time
+      );
+    }
+
     function validStaffStatusChange() {
       let oldStatus = resource.data.status;
       let newStatus = request.resource.data.status;
@@ -125,19 +228,65 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
     }
 
+    match /enrollmentCodes/{codeId} {
+      // El alumno solo puede consultar un código disponible que ya conoce.
+      // La colección no se puede enumerar desde cuentas de alumnos.
+      allow get: if (signedIn() && resource.data.status == 'available') || isAdmin();
+      allow list: if isAdmin();
+
+      allow create: if isAdmin()
+        && codeId.matches('^[A-HJ-NP-Z2-9]{16}$')
+        && request.resource.data.keys().hasOnly(['status', 'createdAt', 'createdBy', 'course', 'division'])
+        && request.resource.data.keys().hasAll(['status', 'createdAt', 'createdBy', 'course', 'division'])
+        && request.resource.data.status == 'available'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.course is string
+        && request.resource.data.course.size() >= 1
+        && request.resource.data.course.size() <= 12
+        && request.resource.data.division is string
+        && request.resource.data.division.size() >= 1
+        && request.resource.data.division.size() <= 8;
+
+      // El código se consume en la misma transacción que crea el perfil.
+      allow update: if (
+          signedIn()
+          && resource.data.status == 'available'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedBy', 'usedAt'])
+          && request.resource.data.status == 'used'
+          && request.resource.data.usedBy == request.auth.uid
+          && request.resource.data.usedAt == request.time
+          && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid))
+          && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.uid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.registrationCodeId == codeId
+          && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.course == resource.data.course
+          && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.division == resource.data.division
+        ) || (
+          isAdmin()
+          && resource.data.status == 'available'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedAt', 'revokedBy'])
+          && request.resource.data.status == 'revoked'
+          && request.resource.data.revokedAt == request.time
+          && request.resource.data.revokedBy == request.auth.uid
+        );
+
+      allow delete: if false;
+    }
+
     match /users/{uid} {
-      allow get: if (signedIn() && request.auth.uid == uid) || isStaff();
-      allow list: if isStaff();
+      // El personal no necesita enumerar perfiles; solo administración puede hacerlo.
+      allow get: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow list: if isAdmin();
 
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.auth.token.email_verified == false
         && request.resource.data.keys().hasOnly([
-          'uid', 'displayName', 'course', 'division',
+          'uid', 'displayName', 'course', 'division', 'registrationCodeId',
           'role', 'active', 'createdAt', 'updatedAt'
         ])
         && request.resource.data.keys().hasAll([
-          'uid', 'displayName', 'course', 'division',
+          'uid', 'displayName', 'course', 'division', 'registrationCodeId',
           'role', 'active', 'createdAt', 'updatedAt'
         ])
         && request.resource.data.uid == uid
@@ -150,6 +299,14 @@ service cloud.firestore {
         && request.resource.data.division is string
         && request.resource.data.division.size() >= 1
         && request.resource.data.division.size() <= 8
+        && request.resource.data.registrationCodeId is string
+        && request.resource.data.registrationCodeId.matches('^[A-HJ-NP-Z2-9]{16}$')
+        && existsAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId))
+        && getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.status == 'used'
+        && getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.usedBy == uid
+        && getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.usedAt == request.time
+        && request.resource.data.course == getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.course
+        && request.resource.data.division == getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.division
         && request.resource.data.role == 'student'
         && request.resource.data.active == true
         && request.resource.data.createdAt is timestamp
@@ -182,13 +339,114 @@ service cloud.firestore {
 
     match /schoolDays/{dateNumber} {
       allow get, list: if signedIn();
-      allow create, update, delete: if isAdmin()
-        && request.resource.data.keys().hasOnly(['open', 'label', 'updatedAt'])
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['dateNumber', 'open', 'label', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['dateNumber', 'open', 'label', 'updatedAt'])
+        && request.resource.data.dateNumber is int
+        && dateNumber == string(request.resource.data.dateNumber)
         && request.resource.data.open is bool
-        && request.resource.data.updatedAt is timestamp;
+        && request.resource.data.label is string
+        && request.resource.data.label.size() <= 80
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow get: if signedIn() && settingId == 'catalog';
+      allow list: if false;
+      allow create, update: if isAdmin()
+        && settingId == 'catalog'
+        && request.resource.data.keys().hasOnly(['products', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasAll(['products', 'updatedAt', 'updatedBy'])
+        && request.resource.data.products is map
+        && request.resource.data.products.keys().hasOnly(['bizcochos', 'facturas'])
+        && request.resource.data.products.keys().hasAll(['bizcochos', 'facturas'])
+        && request.resource.data.products.bizcochos is map
+        && request.resource.data.products.bizcochos.keys().hasOnly(['price', 'active'])
+        && request.resource.data.products.bizcochos.keys().hasAll(['price', 'active'])
+        && request.resource.data.products.bizcochos.price is int
+        && request.resource.data.products.bizcochos.price >= 1
+        && request.resource.data.products.bizcochos.price <= 100000
+        && request.resource.data.products.bizcochos.active is bool
+        && request.resource.data.products.facturas is map
+        && request.resource.data.products.facturas.keys().hasOnly(['price', 'active'])
+        && request.resource.data.products.facturas.keys().hasAll(['price', 'active'])
+        && request.resource.data.products.facturas.price is int
+        && request.resource.data.products.facturas.price >= 1
+        && request.resource.data.products.facturas.price <= 100000
+        && request.resource.data.products.facturas.active is bool
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /dailyAvailability/{dateNumber} {
+      allow get: if signedIn();
+      allow list: if isStaff();
+
+      allow create: if isStaff()
+        && request.resource.data.keys().hasOnly([
+          'dateNumber', 'bizcochosRemaining', 'facturasRemaining',
+          'updatedAt', 'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.keys().hasAll([
+          'dateNumber', 'bizcochosRemaining', 'facturasRemaining',
+          'updatedAt', 'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.dateNumber is int
+        && dateNumber == string(request.resource.data.dateNumber)
+        && request.resource.data.bizcochosRemaining is int
+        && request.resource.data.bizcochosRemaining >= 0
+        && request.resource.data.bizcochosRemaining <= 5000
+        && request.resource.data.facturasRemaining is int
+        && request.resource.data.facturasRemaining >= 0
+        && request.resource.data.facturasRemaining <= 5000
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.lastOrderId == ''
+        && request.resource.data.lastAction == 'configured';
+
+      allow update: if (
+        isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'bizcochosRemaining', 'facturasRemaining', 'updatedAt',
+          'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.dateNumber == resource.data.dateNumber
+        && request.resource.data.bizcochosRemaining is int
+        && request.resource.data.bizcochosRemaining >= 0
+        && request.resource.data.bizcochosRemaining <= 5000
+        && request.resource.data.facturasRemaining is int
+        && request.resource.data.facturasRemaining >= 0
+        && request.resource.data.facturasRemaining <= 5000
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.lastOrderId == ''
+        && request.resource.data.lastAction == 'configured'
+      ) || (
+        activeStudent(request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'bizcochosRemaining', 'facturasRemaining', 'updatedAt',
+          'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.dateNumber == resource.data.dateNumber
+        && stockReservationMatchesOrder(resource.data.dateNumber, request.resource.data)
+      ) || (
+        isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'bizcochosRemaining', 'facturasRemaining', 'updatedAt',
+          'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.dateNumber == resource.data.dateNumber
+        && stockReleaseMatchesOrder(resource.data.dateNumber, request.resource.data)
+      );
+
+      allow delete: if false;
     }
 
     match /orders/{orderId} {
+      // El personal necesita consultar pedidos para organizar la producción y los retiros.
       allow get: if isStaff() || (signedIn() && (resource == null || resource.data.uid == request.auth.uid));
       allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
 
@@ -220,13 +478,15 @@ service cloud.firestore {
         )
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt == request.time
-        && hasAtomicDailyTotal(orderId, request.resource.data);
+        && hasAtomicDailyTotal(orderId, request.resource.data)
+        && hasAtomicAvailability(orderId, request.resource.data);
 
       allow update: if isStaff()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentStatus', 'updatedAt'])
         && request.resource.data.status in ['pending', 'accepted', 'preparing', 'ready', 'delivered', 'cancelled']
         && request.resource.data.paymentStatus in ['unpaid', 'pending_review', 'paid']
         && validStaffStatusChange()
+        && (request.resource.data.status != 'cancelled' || hasAtomicStockRelease(orderId, resource.data))
         && (resource.data.paymentStatus == request.resource.data.paymentStatus
           || (resource.data.paymentStatus in ['unpaid', 'pending_review'] && request.resource.data.paymentStatus == 'paid'))
         && request.resource.data.updatedAt == request.time;
@@ -235,8 +495,9 @@ service cloud.firestore {
     }
 
     match /dailyOrderTotals/{totalId} {
-      allow get: if isStaff() || (signedIn() && (resource == null || resource.data.uid == request.auth.uid));
-      allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+      // El contador diario es privado del alumno; el personal opera desde los pedidos.
+      allow get: if signedIn() && (resource == null || resource.data.uid == request.auth.uid);
+      allow list: if signedIn() && resource.data.uid == request.auth.uid;
 
       allow create: if activeStudent(request.auth.uid)
         && orderWindowOpen()

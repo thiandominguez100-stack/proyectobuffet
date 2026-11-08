@@ -38,7 +38,7 @@
       </form>
       <div class="staff-authorized-step" id="staff-authorized-step" hidden>
         <span class="staff-authorized-icon" aria-hidden="true">✓</span>
-        <h2>Identidad verificada</h2>
+        <h2>Permisos confirmados</h2>
         <p>Tu cuenta tiene permisos de personal. Entrá al panel cuando estés listo.</p>
         <button class="button button-primary" id="staff-enter-panel" type="button">Ingresar al panel</button>
       </div>
@@ -68,6 +68,22 @@
 
       <div class="security-notice" id="staff-security-notice"><span class="notice-icon">i</span><div><strong id="staff-notice-title">Vista de demostración</strong><p id="staff-notice-text">Esta dirección muestra solo el diseño del panel. No se consultan datos ni se aceptan credenciales desde GitHub Pages.</p></div></div>
 
+      <section class="staff-card staff-enrollment-card" id="staff-enrollment-tools" hidden>
+        <div class="card-heading"><div><span class="eyebrow">ALTAS SEGURAS</span><h3>Códigos de inscripción</h3></div><span class="muted-label">SOLO ADMINISTRACIÓN</span></div>
+        <p>Generá un código distinto para cada alumno y entregáselo directamente. Cada código permite crear una sola cuenta. No publiques ni compartas la lista en grupos.</p>
+        <div class="staff-enrollment-controls">
+          <label for="staff-enrollment-course">Curso<input id="staff-enrollment-course" type="text" maxlength="12" placeholder="Ej. 3°" required></label>
+          <label for="staff-enrollment-division">División<input id="staff-enrollment-division" type="text" maxlength="8" placeholder="Ej. A" required></label>
+          <label class="staff-enrollment-count" for="staff-enrollment-quantity">
+            Cantidad de códigos (1 a 300)
+            <input id="staff-enrollment-quantity" name="enrollmentQuantity" type="number" min="1" max="300" step="1" value="25" required>
+          </label>
+          <button class="button button-primary" id="staff-enrollment-create" type="button">Generar lote y descargar CSV</button>
+        </div>
+        <p class="student-auth-feedback" id="staff-enrollment-feedback" role="status" aria-live="polite">Los códigos disponibles aparecerán acá. El CSV contiene solamente códigos, sin nombres ni datos de alumnos.</p>
+        <div class="staff-enrollment-list" id="staff-enrollment-code-list"><p class="empty-state compact">No hay códigos disponibles.</p></div>
+      </section>
+
       <div class="staff-stats">
         <article class="stat-card"><span>PRÓXIMA JORNADA</span><strong id="staff-next-date">—</strong><small>Próximo día hábil</small></article>
         <article class="stat-card"><span>PEDIDOS RECIBIDOS</span><strong id="staff-orders-count">0</strong><small>Pedidos para preparar</small></article>
@@ -89,6 +105,7 @@
           <div class="card-heading"><div><span class="eyebrow">ORGANIZACIÓN</span><h3>Pedidos individuales</h3></div><span class="muted-label" id="staff-orders-status">CARGANDO</span></div>
           <div class="staff-order-tools">
             <label class="staff-order-tool staff-order-search" for="staff-orders-search"><span>Buscar alumno</span><input id="staff-orders-search" type="search" placeholder="Nombre, curso, división o ID" autocomplete="off"></label>
+            <label class="staff-order-tool" for="staff-orders-payment-filter"><span>Estado de pago</span><select id="staff-orders-payment-filter"><option value="all">Todos los pagos</option><option value="unpaid">Efectivo pendiente</option><option value="pending_review">Mercado Pago por verificar</option><option value="paid">Pagados</option></select></label>
             <label class="staff-order-tool" for="staff-orders-slot-filter"><span>Horario de retiro</span><select id="staff-orders-slot-filter"><option value="all">Todos los recreos</option><option value="primer-recreo">Primer recreo · 08:50–09:00</option><option value="ultimo-recreo">Segundo recreo · 10:20–10:30</option></select></label>
             <label class="staff-order-tool" for="staff-orders-status-filter"><span>Estado</span><select id="staff-orders-status-filter"><option value="active">Todos los activos</option><option value="pending">Pendientes</option><option value="accepted">Aceptados</option><option value="preparing">En preparación</option><option value="ready">Listos para retirar</option><option value="delivered">Entregados</option><option value="cancelled">Cancelados</option><option value="all">Todos los pedidos</option></select></label>
           </div>
@@ -99,14 +116,57 @@
           </nav>
         </section>
       <div class="staff-two-col">
-        <section class="staff-card" id="productos"><div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y stock</h3></div></div><div class="mini-product"><span class="mini-product-mark">B</span><span><strong>Bizcochos</strong><small>Precio inicial: $500</small></span><span class="muted-label">Pendiente</span></div><div class="mini-product"><span class="mini-product-mark">F</span><span><strong>Facturas</strong><small>Precio inicial: $1.000</small></span><span class="muted-label">Pendiente</span></div></section>
+        <section class="staff-card" id="productos">
+          <div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y stock</h3></div><span class="muted-label" id="staff-catalog-state">CONFIGURACIÓN PENDIENTE</span></div>
+          <form id="staff-catalog-form" class="staff-catalog-form" hidden>
+            <div class="staff-catalog-product">
+              <strong>Bizcochos</strong>
+              <label>Precio por unidad ($)<input id="staff-price-bizcochos" type="number" min="1" max="100000" step="1" required></label>
+              <label class="staff-check-label"><input id="staff-active-bizcochos" type="checkbox" checked> Disponible en catálogo</label>
+            </div>
+            <div class="staff-catalog-product">
+              <strong>Facturas</strong>
+              <label>Precio por unidad ($)<input id="staff-price-facturas" type="number" min="1" max="100000" step="1" required></label>
+              <label class="staff-check-label"><input id="staff-active-facturas" type="checkbox" checked> Disponible en catálogo</label>
+            </div>
+            <button class="button button-primary" id="staff-catalog-save" type="submit">Guardar precios y catálogo</button>
+          </form>
+          <p class="staff-auth-message" id="staff-catalog-feedback" role="status" aria-live="polite">Consultando el catálogo…</p>
+          <div class="staff-stock-heading"><strong>Stock de la próxima jornada</strong><span id="staff-stock-date">—</span></div>
+          <form id="staff-stock-form" class="staff-stock-form" hidden>
+            <label>Bizcochos disponibles<input id="staff-stock-bizcochos" type="number" min="0" max="5000" step="1" required></label>
+            <label>Facturas disponibles<input id="staff-stock-facturas" type="number" min="0" max="5000" step="1" required></label>
+            <button class="button button-primary" id="staff-stock-save" type="submit">Guardar stock diario</button>
+          </form>
+          <p class="table-footnote">El stock se descuenta automáticamente al confirmar un pedido y vuelve a estar disponible si el personal lo cancela. Los valores mostrados son las unidades que aún quedan para encargar.</p>
+          <p class="staff-auth-message" id="staff-stock-feedback" role="status" aria-live="polite"></p>
+        </section>
       </div>
 
       <div class="staff-two-col">
-        <section class="staff-card" id="calendario"><div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div><div class="empty-state compact"><span>▦</span><strong>Calendario editable</strong><p>Se podrán marcar feriados, vacaciones y días sin clases.</p></div></section>
-        <section class="staff-card" id="pagos"><div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div><div class="empty-state compact"><span>$</span><strong>Verificación manual</strong><p>El personal podrá confirmar efectivo o Mercado Pago.</p></div></section>
+        <section class="staff-card" id="calendario">
+          <div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div><span class="muted-label">EXCEPCIONES DE CLASES</span></div>
+          <p class="table-footnote">Marcá feriados, jornadas sin clases o aperturas especiales. El sistema usará estas excepciones para calcular la próxima jornada.</p>
+          <form id="staff-calendar-form" class="staff-calendar-form" hidden>
+            <label for="staff-calendar-date">Fecha<input id="staff-calendar-date" type="date" required></label>
+            <label for="staff-calendar-open">Tipo<select id="staff-calendar-open"><option value="false">No hay clases</option><option value="true">Sí hay clases</option></select></label>
+            <label for="staff-calendar-label">Descripción<input id="staff-calendar-label" type="text" maxlength="80" placeholder="Ej. Feriado / Jornada especial"></label>
+            <button class="button button-primary" id="staff-calendar-save" type="submit">Guardar fecha</button>
+          </form>
+          <p class="staff-auth-message" id="staff-calendar-feedback" role="status" aria-live="polite"></p>
+          <div class="staff-calendar-list" id="staff-calendar-list"><p class="empty-state compact">Consultando calendario…</p></div>
+        </section>
+        <section class="staff-card" id="pagos">
+          <div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div><span class="muted-label">PEDIDOS DE LA PRÓXIMA JORNADA</span></div>
+          <div class="payment-summary-grid">
+            <article><span>EFECTIVO PENDIENTE</span><strong id="staff-payment-cash-pending">$0</strong><small id="staff-payment-cash-count">0 pedidos</small><button class="button button-outline" type="button" data-payment-filter="unpaid">Ver pedidos</button></article>
+            <article><span>MERCADO PAGO A REVISAR</span><strong id="staff-payment-mp-pending">$0</strong><small id="staff-payment-mp-count">0 pedidos</small><button class="button button-outline" type="button" data-payment-filter="pending_review">Ver pedidos</button></article>
+            <article><span>PAGOS CONFIRMADOS</span><strong id="staff-payment-paid">$0</strong><small id="staff-payment-paid-count">0 pedidos</small><button class="button button-outline" type="button" data-payment-filter="paid">Ver pedidos</button></article>
+          </div>
+          <p class="table-footnote">Los pagos se verifican manualmente. Al revisar un pago, abrí el pedido y pulsá «Confirmar pago». No se consulta automáticamente Mercado Pago.</p>
+        </section>
       </div>
-      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos se guardan en Firebase. El stock y el calendario aún no están conectados.</span></div>
+      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos se guardan en Firebase. El stock aún está pendiente de integración.</span></div>
     </section>
   </main>
   <footer class="site-footer wrap"><span>Buffet 411 · Panel interno</span><span class="footer-status"><i></i> Pedidos conectados</span></footer>
