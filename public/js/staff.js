@@ -838,12 +838,18 @@ $("#staff-calendar-form").addEventListener("submit", async (event) => {
   const dateKey = $("#staff-calendar-date").value;
   const label = $("#staff-calendar-label").value.trim();
   const dateNumber = getDateNumber(dateKey);
+  const openDate = new Date(dateKey + "T12:00:00Z");
+  const selectedAsOpen = $("#staff-calendar-open").value === "true";
+  const isWeekend = openDate.getUTCDay() === 0 || openDate.getUTCDay() === 6;
   const today = getDateNumber(new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Argentina/Cordoba",
     year: "numeric", month: "2-digit", day: "2-digit"
   }).format(new Date()));
-  if (dateNumber <= today || label.length > 80) {
-    feedback.textContent = "Elegí una fecha futura y una descripción de hasta 80 caracteres.";
+  if (!dateKey || !Number.isFinite(openDate.getTime()) || dateNumber <= today ||
+      label.length > 80 || (selectedAsOpen && isWeekend)) {
+    feedback.textContent = selectedAsOpen && isWeekend
+      ? "Las jornadas especiales deben programarse de lunes a viernes."
+      : "Elegí una fecha futura y una descripción de hasta 80 caracteres.";
     return;
   }
 
