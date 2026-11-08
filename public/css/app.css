@@ -175,3 +175,12 @@
 .staff-orders-pagination .button:disabled{opacity:.4;cursor:not-allowed}
 @media(max-width:760px){.staff-order-tools{grid-template-columns:1fr 1fr}.staff-order-search{grid-column:1/-1}}
 @media(max-width:480px){.staff-order-tools{grid-template-columns:1fr}.staff-order-search{grid-column:auto}.staff-orders-pagination{align-items:flex-start;flex-direction:column}.staff-orders-pagination>div{width:100%}.staff-orders-pagination .button{flex:1}}
+
+
+/* Gestión de códigos individuales de inscripción */
+.staff-enrollment-card>p{max-width:760px;color:var(--muted);margin:10px 0 16px}
+.staff-enrollment-list{display:grid;gap:8px;margin-top:14px}
+.staff-enrollment-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);background:var(--surface-2);border-radius:var(--radius)}
+.staff-enrollment-row code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:15px;font-weight:800;letter-spacing:.12em;color:var(--text);margin-right:auto;overflow-wrap:anywhere}
+.staff-enrollment-row .button{min-height:36px;padding-inline:12px}
+@media(max-width:560px){.staff-enrollment-row{align-items:stretch}.staff-enrollment-row code{width:100%;margin:0}.staff-enrollment-row .button{flex:1}}
