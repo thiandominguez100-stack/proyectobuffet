@@ -12,6 +12,7 @@ const rules = await readFile(new URL("../firestore.rules", import.meta.url), "ut
 const orderClient = await readFile(new URL("../public/js/student-orders.js", import.meta.url), "utf8");
 const studentHtml = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const staffHtml = await readFile(new URL("../public/personal.html", import.meta.url), "utf8");
+const staffSource = await readFile(new URL("../public/js/staff.js", import.meta.url), "utf8");
 
 test("la fecha del pedido se convierte a la clave numérica única YYYYMMDD", () => {
   assert.equal(getDateNumber("2026-11-09"), 20261109);
@@ -87,4 +88,13 @@ test("el domingo puede crear pedidos para el lunes y el sábado queda excluido",
   assert.match(rules, /request\.time\.dayOfWeek\(\) == 7/);
   assert.match(rules, /request\.time\.dayOfWeek\(\) < 6 \|\| request\.time\.dayOfWeek\(\) == 7/);
   assert.match(rules, /dateAt\.date\(\) == request\.time\.date\(\) \+ duration\.value\(1, 'd'\)/);
+});
+
+
+test("alumnos y personal utilizan las excepciones del calendario escolar", () => {
+  assert.match(orderClient, /onSnapshot\(collection\(db, "schoolDays"/);
+  assert.match(orderClient, /getNextSchoolDate\(new Date\(\), \{ openDates, closedDates \}\)/);
+  assert.match(staffSource, /getCalendarOptions/);
+  assert.match(rules, /schoolDateIsClosed/);
+  assert.match(rules, /schoolDateIsOpen/);
 });
