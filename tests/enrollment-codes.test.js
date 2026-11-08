@@ -30,9 +30,9 @@ test("rechaza códigos incompletos y caracteres ambiguos", () => {
 
 test("formatea y calcula un hash SHA-256 estable sin almacenar el código original", async () => {
   const first = await hashEnrollmentCode("ABCD-EFGH-JKMN-PQRS");
-  const second = await hashEnrollmentCode("abcdefghijklmnop");
+  const second = await hashEnrollmentCode("abcd-efgh-jkmn-pqrs");
   assert.match(first, /^[a-f0-9]{64}$/);
   assert.equal(first, second);
   assert.notEqual(first, await hashEnrollmentCode("ABCD-EFGH-JKMN-PQRST"));
-  assert.equal(formatEnrollmentCode("abcdefghijklmnop"), "ABCD-EFGH-JKMN-PQRS");
+  assert.equal(formatEnrollmentCode("abcd-efgh-jkmn-pqrs"), "ABCD-EFGH-JKMN-PQRS");
 });
