@@ -226,7 +226,7 @@ service cloud.firestore {
     }
 
     match /dailyOrderTotals/{totalId} {
-      allow get: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow get: if isStaff() || (signedIn() && (resource == null || resource.data.uid == request.auth.uid));
       allow list: if isStaff() || (signedIn() && resource.data.uid == request.auth.uid);
 
       allow create: if activeStudent(request.auth.uid)
