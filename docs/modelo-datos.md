@@ -1,6 +1,6 @@
 # Modelo de datos — Buffet 411
 
-Este es el modelo propuesto para la primera versión. Las reglas de Firestore se mantienen cerradas hasta implementar y probar la autorización completa.
+Este modelo describe los perfiles y el primer flujo de pedidos implementado en el código. Las reglas de pedidos están preparadas en el repositorio, pero todavía no se han publicado en Firebase ni validado con el emulador.
 
 ## Productos
 
@@ -44,7 +44,10 @@ El documento solo puede ser leído, creado, actualizado o eliminado por su titul
 Un documento por encargo:
 
 - `uid`: UID del alumno.
-- `serviceDate`: fecha de la jornada de retiro, formato `YYYY-MM-DD`.
+- `displayName`, `course`, `division`: instantánea mínima del perfil al confirmar.
+- `serviceDateAt`: timestamp en medianoche de Argentina (03:00 UTC).
+- `serviceDateNumber`: fecha numérica `YYYYMMDD`.
+- `dailyTotalId`: ID del contador diario asociado.
 - `pickupSlot`: `primer-recreo` o `ultimo-recreo`.
 - `items`: mapa con cantidades de `bizcochos` y `facturas`.
 - `quantity`: suma de ambos productos.
@@ -52,22 +55,24 @@ Un documento por encargo:
 - `paymentMethod`: `cash` o `mercadopago`.
 - `paymentStatus`: `unpaid`, `pending_review` o `paid`.
 - `status`: `pending`, `accepted`, `preparing`, `ready`, `delivered` o `cancelled`.
-- `createdAt`, `updatedAt`, `cancelUntil`: marcas de tiempo del servidor.
+- `createdAt`: marca de tiempo del servidor; `updatedAt` se agrega cuando el personal cambia estado o pago.
 
 No se guardará el correo del alumno en cada pedido. Para el panel operativo se guardará una instantánea mínima de nombre, curso y división cuando sea necesaria para organizar la entrega.
 
-### `studentDailyTotals/{uid_serviceDate}`
+### `dailyOrderTotals/{uid_YYYYMMDD}`
 
 Contador único por alumno y jornada:
 
 - `uid`
-- `serviceDate`
-- `quantity`: total combinado de bizcochos y facturas de todos los pedidos no cancelados.
+- `serviceDateNumber`: fecha numérica `YYYYMMDD`.
+- `quantity`: total combinado de todas las unidades reservadas para la jornada.
+- `orderCount`: cantidad de pedidos creados.
+- `latestOrderId`: último ID de pedido escrito en la transacción.
 - `updatedAt`
 
 **Regla invariable:** `quantity <= 5`. La suma no se reinicia al crear otro pedido; todos los encargos de la misma persona para la misma jornada utilizan el mismo contador.
 
-### `schoolDays/{YYYY-MM-DD}`
+### `schoolDays/{YYYYMMDD}`
 
 Calendario de jornadas:
 
@@ -75,7 +80,7 @@ Calendario de jornadas:
 - `label`: motivo opcional (feriado, jornada especial, vacaciones).
 - `updatedAt`.
 
-Se omiten los fines de semana por defecto, salvo que el calendario administrativo marque explícitamente una jornada especial abierta. Los días cerrados tienen prioridad sobre una apertura accidental.
+Las reglas actuales permiten lunes a viernes y consultan el documento de la siguiente jornada para rechazar una fecha marcada `open: false`. La selección automática de la próxima fecha después de varios feriados y las jornadas especiales de fin de semana siguen pendientes de la pantalla de calendario.
 
 ### `dailyAvailability/{YYYY-MM-DD}`
 
@@ -99,17 +104,17 @@ Registro de operaciones administrativas y del personal. No debe incluir contrase
 
 El navegador calcula el carrito para orientar al alumno, pero ese cálculo por sí solo no es una medida de seguridad.
 
-Al confirmar un pedido, el cliente debe usar una transacción de Firestore:
+Al confirmar un pedido, el cliente usa una transacción de Firestore:
 
-1. Leer `studentDailyTotals/{uid_serviceDate}`.
+1. Leer `dailyOrderTotals/{uid_YYYYMMDD}`.
 2. Calcular la nueva suma combinada de unidades.
 3. Rechazar si supera 5.
-4. Crear el pedido y actualizar el contador dentro de la misma transacción.
+4. Crear `orders/{orderId}` y actualizar `dailyOrderTotals/{uid_YYYYMMDD}` dentro de la misma transacción.
 5. Reintentar con el valor actualizado si otra operación concurrente cambió el contador.
 
-Las reglas definitivas deben exigir que el pedido y el contador cambien juntos y que `quantity` sea como máximo 5. No se habilitarán escrituras directas de contadores aislados.
+Las reglas preparadas exigen que el pedido y el contador cambien juntos mediante `getAfter()` y que `quantity` sea como máximo 5. No se habilitan escrituras directas de contadores aislados. Estas reglas aún deben publicarse y probarse en Firebase.
 
-La cancelación válida debe actualizar el pedido y liberar la cantidad reservada en el contador de forma atómica. La política exacta de liberación de cupo y la fecha límite se fijarán en reglas antes de habilitar cancelaciones reales.
+Por ahora, una cancelación de personal cambia el estado del pedido, pero no libera unidades del contador. La cancelación por el propio alumno y la política de devolución del cupo se implementarán después de definir la fecha límite; el límite no se reinicia con pedidos nuevos ni cancelaciones.
 
 ## Privacidad y acceso
 
