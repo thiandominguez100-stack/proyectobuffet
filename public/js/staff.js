@@ -236,11 +236,19 @@ function renderStaffOrders(orders) {
     : "SIN PEDIDOS";
 }
 
+function setOrdersConnectionState(state, title, description) {
+  $("#staff-mode-badge").textContent = state;
+  $("#staff-notice-title").textContent = title;
+  $("#staff-notice-text").textContent = description;
+}
+
 function startStaffOrders() {
   stopStaffOrders();
-  $("#staff-mode-badge").textContent = "PEDIDOS EN VIVO";
-  $("#staff-notice-title").textContent = "Pedidos conectados";
-  $("#staff-notice-text").textContent = "Los pedidos y sus estados se actualizan desde Firestore. La administración de stock y calendario se incorporará en la siguiente etapa.";
+  setOrdersConnectionState(
+    "CONECTANDO…",
+    "Comprobando conexión",
+    "Estamos consultando Firestore para verificar el acceso a los pedidos."
+  );
   const dateKey = getNextSchoolDate(new Date());
   const number = getDateNumber(dateKey);
   $("#staff-next-date").textContent = dateLabel(dateKey);
@@ -250,15 +258,38 @@ function startStaffOrders() {
     collection(db, "orders"),
     where("serviceDateNumber", "==", number)
   );
-  stopOrdersListener = onSnapshot(ordersQuery, (snapshot) => {
+  stopOrdersListener = onSnapshot(ordersQuery, { includeMetadataChanges: true }, (snapshot) => {
+    if (snapshot.metadata.fromCache) {
+      setOrdersConnectionState(
+        "DATOS EN CACHÉ",
+        "Mostrando datos guardados",
+        "Todavía no se confirmó la conexión con Firestore. Los datos pueden estar desactualizados."
+      );
+    } else {
+      setOrdersConnectionState(
+        "PEDIDOS EN VIVO",
+        "Pedidos conectados",
+        "La conexión con Firestore está confirmada. Los pedidos y sus estados se actualizan en tiempo real. La administración de stock y calendario se incorporará en la siguiente etapa."
+      );
+    }
     const orders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
     renderStaffOrders(orders);
   }, (error) => {
     console.error("No se pudieron cargar los pedidos del buffet:", error);
-    $("#staff-orders-status").textContent = error.code === "permission-denied"
+    const permissionDenied = error.code === "permission-denied";
+    setOrdersConnectionState(
+      permissionDenied ? "SIN PERMISO" : "ERROR DE CONEXIÓN",
+      permissionDenied ? "Firestore rechazó el acceso" : "No se pudo conectar",
+      permissionDenied
+        ? "La cuenta inició sesión, pero las reglas de Firestore no permiten consultar los pedidos. Hay que revisar y publicar las reglas de pedidos."
+        : "No pudimos consultar los pedidos. Comprobá la conexión a internet e intentá nuevamente."
+    );
+    $("#staff-orders-status").textContent = permissionDenied
       ? "ACCESO DENEGADO"
       : "ERROR DE CONEXIÓN";
-    $("#staff-orders-list").textContent = "No se pudieron consultar los pedidos. Revisá las reglas de Firestore y la conexión.";
+    $("#staff-orders-list").textContent = permissionDenied
+      ? "La cuenta está autorizada para entrar, pero Firestore no permite leer los pedidos. Revisá las reglas."
+      : "No se pudieron consultar los pedidos. Revisá la conexión e intentá nuevamente.";
   });
 }
 
