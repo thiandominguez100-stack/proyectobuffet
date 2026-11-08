@@ -123,7 +123,8 @@ test("el panel muestra herramientas de inscripción solo a administración", () 
   assert.match(staffHtml, /id="staff-enrollment-create"/);
   assert.match(staffHtml, /id="staff-enrollment-quantity"/);
   assert.match(staff, /generateEnrollmentCodes\(requestedCount\)/);
-  assert.match(staff, /downloadEnrollmentCodesCsv\(savedCodes\)/);
+  assert.match(staff, /downloadEnrollmentCodesCsv\(savedCodes, course, division\)/);
+  assert.match(staff, /"Código de inscripción", "Curso", "División"/);
 });
 
 test("personal operativo no puede enumerar perfiles ni contadores privados", () => {
