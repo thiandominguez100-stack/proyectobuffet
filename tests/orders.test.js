@@ -63,3 +63,11 @@ test("el alumno puede confirmar el recreo y el método de pago", () => {
   assert.match(studentHtml, /id="checkout-payment"/);
   assert.match(studentHtml, /id="student-orders-list"/);
 });
+
+
+test("GitHub Pages no acepta pedidos ni consulta Firestore", async () => {
+  const preview = orderClient.slice(0, orderClient.indexOf("} else {"));
+  assert.match(preview, /location\.hostname\.endsWith\("\.github\.io"\)/);
+  assert.match(preview, /checkout\.disabled = true/);
+  assert.doesNotMatch(preview, /runTransaction|onSnapshot|firebase\.js/);
+});
