@@ -16,6 +16,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  Timestamp,
   updateDoc,
   where
 } from "firebase/firestore";
@@ -235,6 +236,121 @@ test("solo administración puede enumerar perfiles y códigos", async () => {
   assert.equal(codes.size, 1);
 });
 
+
+const orderWindowParts = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/Argentina/Cordoba",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23"
+}).formatToParts(new Date());
+const orderWindowHour = Number(orderWindowParts.find((part) => part.type === "hour")?.value);
+const orderWindowWeekday = orderWindowParts.find((part) => part.type === "weekday")?.value;
+const orderWindowIsOpen = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sun"].includes(orderWindowWeekday)
+  && orderWindowHour >= 13 && orderWindowHour < 17;
+
+test("un pedido reserva stock y actualiza el límite diario en una sola transacción", {
+  skip: !orderWindowIsOpen
+}, async () => {
+  const todayKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Cordoba",
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+  const [year, month, day] = todayKey.split("-").map(Number);
+  const nextDay = new Date(Date.UTC(year, month - 1, day));
+  do {
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  } while (nextDay.getUTCDay() === 0 || nextDay.getUTCDay() === 6);
+  const serviceDateKey = nextDay.toISOString().slice(0, 10);
+  const serviceDateNumber = Number(serviceDateKey.replace(/-/g, ""));
+  const serviceDateAt = Timestamp.fromDate(new Date(serviceDateKey + "T03:00:00.000Z"));
+
+  const studentDb = testEnv.authenticatedContext("student-1", {
+    email_verified: true
+  }).firestore();
+  const catalogRef = doc(studentDb, "settings", "catalog");
+  const stockRef = doc(studentDb, "dailyAvailability", String(serviceDateNumber));
+  const totalId = "student-1_" + serviceDateNumber;
+  const totalRef = doc(studentDb, "dailyOrderTotals", totalId);
+  const orderRef = doc(studentDb, "orders", "new-transactional-order");
+
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const adminDb = context.firestore();
+    await setDoc(catalogRef, {
+      products: {
+        bizcochos: { price: 700, active: true },
+        facturas: { price: 1200, active: true }
+      },
+      updatedAt: new Date(),
+      updatedBy: "admin-1"
+    });
+    await setDoc(stockRef, {
+      dateNumber: serviceDateNumber,
+      bizcochosRemaining: 10,
+      facturasRemaining: 10,
+      updatedAt: new Date(),
+      updatedBy: "admin-1",
+      lastOrderId: "",
+      lastAction: "configured"
+    });
+  });
+
+  await assertSucceeds(runTransaction(studentDb, async (transaction) => {
+    const totalSnapshot = await transaction.get(totalRef);
+    const stockSnapshot = await transaction.get(stockRef);
+    const catalogSnapshot = await transaction.get(catalogRef);
+    const oldQuantity = totalSnapshot.exists() ? totalSnapshot.data().quantity : 0;
+    const oldOrderCount = totalSnapshot.exists() ? totalSnapshot.data().orderCount : 0;
+    const stock = stockSnapshot.data();
+    const items = { bizcochos: 2, facturas: 1 };
+    const quantity = 3;
+    const total = 2 * 700 + 1 * 1200;
+
+    transaction.set(orderRef, {
+      uid: "student-1",
+      displayName: "Alumno de prueba",
+      course: "3°",
+      division: "A",
+      serviceDateAt,
+      serviceDateNumber,
+      dailyTotalId: totalId,
+      items,
+      quantity,
+      total,
+      pickupSlot: "primer-recreo",
+      paymentMethod: "cash",
+      paymentStatus: "unpaid",
+      status: "pending",
+      createdAt: serverTimestamp()
+    });
+
+    transaction.set(totalRef, {
+      uid: "student-1",
+      serviceDateNumber,
+      quantity: oldQuantity + quantity,
+      orderCount: oldOrderCount + 1,
+      latestOrderId: orderRef.id,
+      updatedAt: serverTimestamp()
+    });
+
+    transaction.update(stockRef, {
+      bizcochosRemaining: stock.bizcochosRemaining - items.bizcochos,
+      facturasRemaining: stock.facturasRemaining - items.facturas,
+      updatedAt: serverTimestamp(),
+      updatedBy: "student-1",
+      lastOrderId: orderRef.id,
+      lastAction: "reserved"
+    });
+  }));
+
+  const savedOrder = await getDoc(orderRef);
+  const savedStock = await getDoc(stockRef);
+  const savedTotal = await getDoc(totalRef);
+  assert.equal(savedOrder.data().total, 2600);
+  assert.equal(savedStock.data().bizcochosRemaining, 8);
+  assert.equal(savedStock.data().facturasRemaining, 9);
+  assert.equal(savedTotal.data().quantity, 3);
+});
 
 test("solo administración puede modificar precios y activar productos", async () => {
   const adminDb = testEnv.authenticatedContext("admin-1").firestore();
