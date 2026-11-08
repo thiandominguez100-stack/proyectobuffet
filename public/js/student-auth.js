@@ -226,14 +226,12 @@ registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (authOperationInProgress) return;
   const displayName = $("#student-register-name").value.trim();
-  const course = $("#student-register-course").value.trim();
-  const division = $("#student-register-division").value.trim();
   const email = $("#student-register-email").value.trim();
   const registrationCode = normalizeEnrollmentCode($("#student-register-code").value);
   const password = $("#student-register-password").value;
   const confirmation = $("#student-register-confirm").value;
-  if (displayName.length < 2 || displayName.length > 32 || !course || !division) {
-    showFeedback("Completá nombre, curso y división correctamente.", "error");
+  if (displayName.length < 2 || displayName.length > 32) {
+    showFeedback("Ingresá un nombre para mostrar de entre 2 y 32 caracteres.", "error");
     return;
   }
   if (!isValidEnrollmentCode(registrationCode)) {
@@ -264,12 +262,17 @@ registerForm.addEventListener("submit", async (event) => {
         throw new Error("ENROLLMENT_CODE_INVALID");
       }
 
+      const codeData = codeSnapshot.data();
+      if (typeof codeData.course !== "string" || typeof codeData.division !== "string") {
+        throw new Error("ENROLLMENT_CODE_INVALID");
+      }
+
       const userRef = doc(db, "users", newUser.uid);
       transaction.set(userRef, {
         uid: newUser.uid,
         displayName,
-        course,
-        division,
+        course: codeData.course,
+        division: codeData.division,
         registrationCodeId: registrationCode,
         role: "student",
         active: true,
