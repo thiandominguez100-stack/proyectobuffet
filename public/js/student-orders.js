@@ -6,7 +6,6 @@ import {
   collection,
   doc,
   getDoc,
-  limit,
   onSnapshot,
   query,
   runTransaction,
@@ -178,8 +177,7 @@ async function connectStudent(user, token) {
 
   const ownOrders = query(
     collection(db, "orders"),
-    where("uid", "==", user.uid),
-    limit(50)
+    where("uid", "==", user.uid)
   );
   stopOrders = onSnapshot(ownOrders, (snapshot) => {
     if (token !== authLoadToken) return;
