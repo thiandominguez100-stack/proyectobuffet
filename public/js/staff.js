@@ -436,7 +436,7 @@ if (enrollmentForm) {
       }
 
       await batch.commit();
-      enrollmentOutput.value = generatedCodes.join("\\n");
+      enrollmentOutput.value = generatedCodes.join("\n");
       $("#staff-enrollment-results").hidden = false;
       enrollmentMessage.textContent = generatedCodes.length + " código(s) creado(s). Guardalos y entregalos individualmente.";
     } catch (error) {
