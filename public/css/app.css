@@ -28,3 +28,12 @@
 
 /* Evita que el estilo grid del contenedor de acceso anule el atributo hidden. */
 #staff-auth[hidden]{display:none!important}
+
+/* Paso intermedio tras validar la cuenta del personal. */
+.staff-authorized-step{padding:18px 0 8px;display:grid;justify-items:start;gap:10px}
+.staff-authorized-step[hidden]{display:none!important}
+.staff-authorized-icon{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--blue-soft);color:var(--green);font-size:23px;font-weight:800}
+.staff-authorized-step h2{font-size:19px;margin:2px 0}
+.staff-authorized-step p{font-size:12px;line-height:1.6;color:var(--muted);margin:0 0 5px}
+.staff-authorized-step .button{width:100%}
+.staff-login-form[hidden]{display:none!important}
