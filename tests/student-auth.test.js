@@ -48,7 +48,7 @@ test("los pedidos tienen reglas explícitas y las colecciones desconocidas sigue
 
 test("GitHub Pages muestra solo la demo y no carga autenticación", () => {
   const preview = auth.slice(0, auth.indexOf("} else {"));
-  assert.match(preview, /location\.hostname\.endsWith\("\.github\.io"\)/);
+  assert.match(preview, /location\.hostname !== "buffet411-f80af\.web\.app"/);
   assert.match(preview, /Vista de demostración/);
   assert.doesNotMatch(preview, /signInWithEmailAndPassword|onAuthStateChanged|firebase\.js/);
 });
