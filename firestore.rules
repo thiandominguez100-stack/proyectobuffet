@@ -193,6 +193,22 @@ service cloud.firestore {
         && newTotal.updatedAt == request.time;
     }
 
+    function hasAtomicStockRelease(orderId, oldOrder) {
+      let stockPath = /databases/$(database)/documents/dailyAvailability/$(string(oldOrder.serviceDateNumber));
+      let oldStock = exists(stockPath) ? get(stockPath).data : {};
+      let newStock = existsAfter(stockPath) ? getAfter(stockPath).data : {};
+      return !exists(stockPath) || (
+        existsAfter(stockPath)
+        && newStock.dateNumber == oldOrder.serviceDateNumber
+        && newStock.bizcochosRemaining == oldStock.bizcochosRemaining + oldOrder.items.bizcochos
+        && newStock.facturasRemaining == oldStock.facturasRemaining + oldOrder.items.facturas
+        && newStock.lastOrderId == orderId
+        && newStock.lastAction == 'released'
+        && newStock.updatedBy == request.auth.uid
+        && newStock.updatedAt == request.time
+      );
+    }
+
     function validStaffStatusChange() {
       let oldStatus = resource.data.status;
       let newStatus = request.resource.data.status;
@@ -456,6 +472,7 @@ service cloud.firestore {
         && request.resource.data.status in ['pending', 'accepted', 'preparing', 'ready', 'delivered', 'cancelled']
         && request.resource.data.paymentStatus in ['unpaid', 'pending_review', 'paid']
         && validStaffStatusChange()
+        && (request.resource.data.status != 'cancelled' || hasAtomicStockRelease(orderId, resource.data))
         && (resource.data.paymentStatus == request.resource.data.paymentStatus
           || (resource.data.paymentStatus in ['unpaid', 'pending_review'] && request.resource.data.paymentStatus == 'paid'))
         && request.resource.data.updatedAt == request.time;
