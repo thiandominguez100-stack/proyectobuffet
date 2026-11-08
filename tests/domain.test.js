@@ -81,6 +81,18 @@ test("calcula la próxima jornada de lunes a viernes y respeta cierres y apertur
   assert.equal(getNextSchoolDate(friday, { openDates: ["2026-11-08"] }), "2026-11-08");
 });
 
+test("limita el cálculo de la próxima jornada al horizonte de siete días", () => {
+  const sunday = new Date("2026-11-08T16:00:00.000Z");
+  const closedDates = [
+    "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12",
+    "2026-11-13", "2026-11-14", "2026-11-15"
+  ];
+  assert.throws(
+    () => getNextSchoolDate(sunday, { closedDates, maxDays: 7 }),
+    /No se encontró una próxima jornada/
+  );
+});
+
 test("crea un resumen de pedido validado", () => {
   const cart = addProductToCart(
     addProductToCart(createEmptyCart(), "bizcochos", 2),
