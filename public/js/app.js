@@ -80,7 +80,7 @@ import {
     if (!catalogConfigured || !stockConfigured) return false;
     return Object.keys(catalogPrices).every(function (productId) {
       var quantity = Number(cart[productId] || 0);
-      return catalogEnabled[productId] && quantity <= stockRemaining[productId];
+      return quantity === 0 || (catalogEnabled[productId] && quantity <= stockRemaining[productId]);
     });
   }
 
