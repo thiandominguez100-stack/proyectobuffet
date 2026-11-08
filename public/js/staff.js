@@ -4,24 +4,24 @@ if (location.hostname.endsWith(".github.io")) {
   const dashboard = document.querySelector("#staff-dashboard");
   if (authPanel) authPanel.hidden = true;
   if (dashboard) dashboard.hidden = false;
-} else {
-import { auth, db } from "./firebase.js";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut
-} from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
-import {
-  collection,
-  doc,
-  getDoc,
-  onSnapshot,
-  query,
-  serverTimestamp,
-  updateDoc,
-  where
-} from "https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js";
-import { formatARS, getNextSchoolDate, getDateNumber } from "./domain.js";
+else {
+  const { auth, db } = await import("./firebase.js");
+  const {
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut
+  } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js");
+  const {
+    collection,
+    doc,
+    getDoc,
+    onSnapshot,
+    query,
+    serverTimestamp,
+    updateDoc,
+    where
+  } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
+  const { formatARS, getNextSchoolDate, getDateNumber } = await import("./domain.js");
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#staff-login-form");
