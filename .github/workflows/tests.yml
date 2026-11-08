@@ -21,3 +21,23 @@ jobs:
           node-version: 24
       - name: Ejecutar pruebas
         run: npm test
+
+  firestore-rules-tests:
+    name: Reglas reales con Firestore Emulator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Configurar Java para el emulador
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Instalar herramientas de pruebas
+        run: npm install --no-save --package-lock=false firebase @firebase/rules-unit-testing firebase-tools
+      - name: Ejecutar pruebas reales de reglas
+        run: npx firebase emulators:exec --only firestore --project demo-buffet411 "npm run test:rules"
