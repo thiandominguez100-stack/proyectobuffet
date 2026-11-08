@@ -23,9 +23,9 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 ## Reglas funcionales acordadas
 
 - Productos iniciales: Bizcochos ($500) y Facturas ($1.000).
-- Pedidos: de 13:00 inclusive a antes de las 17:00, hora de Argentina.
+- Pedidos: domingo a viernes, de 13:00 inclusive a antes de las 17:00, hora de Argentina; sábado cerrado.
 - Retiro: 08:50–09:00 o 10:20–10:30.
-- Los pedidos se asignan al próximo día habilitado en el calendario escolar.
+- Los pedidos se asignan a la próxima jornada escolar habilitada. La regla actual contempla lunes a viernes y permite pedir el domingo para retirar el lunes; el sábado queda cerrado. Las excepciones de feriados y jornadas especiales todavía requieren integrar el calendario escolar.
 - Métodos de pago: efectivo y Mercado Pago.
 - No se almacenarán comprobantes como imágenes en Firebase Storage. La verificación de Mercado Pago será manual.
 - Los alumnos tendrán cuenta individual con correo real verificado y contraseña.
@@ -59,9 +59,11 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 
 ## Estado actual
 
-El proyecto Firebase `buffet411-f80af` ya tiene una app web registrada y una base Cloud Firestore Standard creada. Authentication utiliza correo y contraseña. Las reglas de perfiles y fotos están publicadas y las reglas para pedidos se prepararon en `firestore.rules`, pero todavía deben publicarse en Firebase Console. El código ya guarda pedidos y contadores de cinco unidades en una transacción y conecta la vista de personal; no se debe probar con pedidos reales hasta publicar y validar las reglas de pedidos.
+El proyecto Firebase `buffet411-f80af` tiene Hosting y Authentication activos, y el panel del personal ya confirmó una lectura en vivo de la colección de pedidos. El acceso de alumnos y el catálogo fueron comprobados manualmente. El repositorio contiene reglas explícitas para pedidos y límites diarios en `firestore.rules`; cualquier cambio nuevo de esas reglas debe publicarse también en Firestore Console. La última corrección del horario dominical debe quedar publicada tanto en Firestore Rules como en Hosting (`public/js/domain.js`) antes de considerar habilitados los pedidos de domingo.
 
-**No usar con cuentas reales ni publicar como operativo** hasta publicar las reglas de pedidos, comprobarlas en Firebase, completar la integración con calendario y stock, y obtener autorización de la escuela.
+El guardado de pedidos todavía necesita una prueba controlada de extremo a extremo: creación por alumno, aparición en el panel, cambio de estado y actualización de «Mis pedidos». Las pruebas de `npm test` son pruebas locales de lógica/estructura; no sustituyen una prueba con Firebase ni una prueba del emulador.
+
+El calendario escolar editable y el control de stock/precios todavía no están integrados. No abrir el servicio a todos los alumnos hasta completar las pruebas, revisar privacidad/datos y obtener autorización de la escuela. Mantener el proyecto en Firebase Spark; no habilitar Blaze ni servicios pagos sin una decisión expresa del responsable.
 
 ## Privacidad
 
