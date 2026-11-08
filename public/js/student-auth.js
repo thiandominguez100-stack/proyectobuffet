@@ -14,7 +14,7 @@ if (location.hostname.endsWith(".github.io")) {
   }
   if (footer) footer.hidden = false;
   if (account) account.hidden = true;
-else {
+} else {
   const { auth, db } = await import("./firebase.js");
   const {
     createUserWithEmailAndPassword,
