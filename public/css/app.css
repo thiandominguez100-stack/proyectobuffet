@@ -100,3 +100,58 @@
   .student-form-grid{gap:8px}
   .student-profile-card{padding:19px}
 }
+
+/* Pedidos reales: checkout, historial del alumno y vista operativa del personal. */
+.student-daily-usage{font-size:10px!important;color:var(--blue)!important;font-weight:700;margin-top:5px!important}
+.student-orders-panel{margin-top:38px}
+.student-orders-list{display:grid;gap:10px}
+.student-order-card,.staff-order-card{padding:16px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow)}
+.student-order-top,.student-order-bottom,.staff-order-top,.staff-order-status-line,.staff-order-footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.student-order-top>strong{font-size:12px}
+.student-order-status{display:inline-flex;align-items:center;gap:5px;padding:6px 9px;border:1px solid var(--line);font-size:9px;font-weight:800;letter-spacing:.25px}
+.status-pending{color:#b7791f;background:#f5e8ca}
+.status-accepted{color:#23659a;background:#dcecf8}
+.status-preparing{color:#8a5b13;background:#f7e8c9}
+.status-ready{color:#18764d;background:#d9f2e5}
+.status-delivered{color:#4c657a;background:#e4ebf0}
+.status-cancelled{color:#9d3b3b;background:#f7dddd}
+.student-order-meta{font-size:10px;line-height:1.5;color:var(--muted);margin:9px 0 0}
+.student-order-bottom{border-top:1px solid var(--line);padding-top:11px;margin-top:11px}
+.student-order-bottom span,.staff-order-payment{font-size:9px;color:var(--muted)}
+.student-order-bottom strong{font-size:15px}
+.student-checkout-dialog{width:min(100% - 26px,470px);max-width:470px;max-height:90vh;padding:0;border:1px solid var(--line);background:var(--surface);color:var(--text);box-shadow:0 20px 60px #0005}
+.student-checkout-dialog::backdrop{background:#071522b8;backdrop-filter:blur(3px)}
+.student-checkout-card{padding:24px;display:grid;gap:11px;overflow:auto}
+.student-checkout-card h2{font-size:23px;margin:4px 0 0}
+.student-checkout-card>label{font-size:11px;font-weight:700}
+.student-checkout-card select{width:100%;min-height:43px;padding:10px 12px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);font:inherit;font-size:12px;border-radius:var(--radius)}
+.checkout-date-box{display:grid;gap:4px;padding:13px;background:var(--blue-soft);margin:4px 0 3px}
+.checkout-date-box small{font-size:9px;font-weight:800;letter-spacing:.8px;color:var(--blue);text-transform:uppercase}
+.checkout-date-box strong{font-size:14px;text-transform:capitalize}
+.checkout-date-box span{font-size:9px;color:var(--muted)}
+.checkout-total{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:12px;margin-top:5px}
+.checkout-total span{font-size:11px;color:var(--muted)}
+.checkout-total strong{font-size:22px}
+.student-checkout-card>.button{width:100%}
+.staff-orders-list{display:grid;gap:10px}
+.staff-order-card{box-shadow:none}
+.staff-order-top>div{display:grid;gap:4px}
+.staff-order-top strong{font-size:12px}
+.staff-order-top small{font-size:9px;color:var(--muted)}
+.staff-order-id{font-size:9px;color:var(--muted);font-weight:800}
+.staff-order-status-line{justify-content:flex-start;flex-wrap:wrap;margin-top:10px}
+.staff-order-footer{align-items:flex-start;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+.staff-order-footer>strong{font-size:15px;white-space:nowrap}
+.staff-order-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
+.staff-order-action{min-height:33px;padding:0 10px;font-size:9px}
+.staff-order-action[data-kind=primary]{background:var(--blue);color:#fff;border-color:var(--blue)}
+.staff-order-action:disabled{opacity:.5;cursor:wait}
+#student-orders-list .cart-empty{padding:18px;background:var(--surface);border:1px solid var(--line)}
+@media(max-width:650px){
+  .student-order-card,.staff-order-card{padding:13px}
+  .student-order-top{align-items:flex-start;flex-direction:column;gap:7px}
+  .staff-order-footer{flex-direction:column}
+  .staff-order-actions{justify-content:flex-start;width:100%}
+  .staff-order-action{flex:1 1 auto}
+  .student-checkout-card{padding:19px}
+}
