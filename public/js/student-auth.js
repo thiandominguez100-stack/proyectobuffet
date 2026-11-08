@@ -295,16 +295,49 @@ registerForm.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     console.error("No se pudo crear la cuenta:", error);
-    if (newUser) await deleteUser(newUser).catch(() => {});
-    const message = error.code === "auth/email-already-in-use"
-      ? "Ese correo ya tiene una cuenta. Probá ingresar."
-      : error.code === "auth/invalid-email"
-        ? "Ingresá una dirección de correo válida."
-        : error.code === "auth/weak-password"
-          ? "Elegí una contraseña más segura, de al menos 8 caracteres."
-          : error.message === "ENROLLMENT_CODE_INVALID" || error.code === "permission-denied"
-            ? "El código no existe, ya fue utilizado o no está habilitado. Pedí uno al personal del buffet."
-            : "No se pudo crear la cuenta. Revisá los datos e intentá nuevamente.";
+    let preserveAccount = false;
+    let profileCheckFailed = false;
+
+    if (newUser) {
+      try {
+        // A network error may happen after Firestore committed both writes.
+        // Never delete the Auth user until we know that the profile was not created.
+        const existingProfile = await getDoc(doc(db, "users", newUser.uid));
+        preserveAccount = existingProfile.exists()
+          && existingProfile.data().uid === newUser.uid
+          && existingProfile.data().role === "student"
+          && existingProfile.data().registrationCodeId === registrationCode;
+
+        if (!preserveAccount && !existingProfile.exists()) {
+          try {
+            await deleteUser(newUser);
+          } catch (deleteError) {
+            console.error("No se pudo limpiar la cuenta de registro incompleta:", deleteError);
+          }
+        }
+      } catch (profileError) {
+        profileCheckFailed = true;
+        console.error("No se pudo verificar si el perfil se creó:", profileError);
+      }
+    }
+
+    if (preserveAccount) {
+      showVerificationPanel();
+      showFeedback("La cuenta se creó correctamente. Revisá tu correo; si no recibiste el mensaje, podés reenviarlo desde esta pantalla.", "success");
+      return;
+    }
+
+    const message = profileCheckFailed
+      ? "No pudimos confirmar si tu cuenta se creó. No uses otro código ni vuelvas a registrarte todavía; intentá ingresar con el mismo correo más tarde o consultá al personal."
+      : error.code === "auth/email-already-in-use"
+        ? "Ese correo ya tiene una cuenta. Probá ingresar."
+        : error.code === "auth/invalid-email"
+          ? "Ingresá una dirección de correo válida."
+          : error.code === "auth/weak-password"
+            ? "Elegí una contraseña más segura, de al menos 8 caracteres."
+            : error.message === "ENROLLMENT_CODE_INVALID" || error.code === "permission-denied"
+              ? "El código no existe, ya fue utilizado o no está habilitado. Pedí uno al personal del buffet."
+              : "No se pudo crear la cuenta. Revisá los datos e intentá nuevamente.";
     showAuthMode("register");
     showFeedback(message, "error");
   } finally {
