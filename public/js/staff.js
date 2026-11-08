@@ -23,6 +23,7 @@ if (location.hostname.endsWith(".github.io")) {
     where
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
   const { formatARS, getNextSchoolDate, getDateNumber } = await import("./domain.js");
+  const { generateEnrollmentCode } = await import("./enrollment.js");
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#staff-login-form");
@@ -92,15 +93,6 @@ async function checkStaffRole(user) {
   return role === "staff" || role === "admin" ? role : null;
 }
 
-function generateEnrollmentCode() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = new Uint8Array(16);
-  if (!globalThis.crypto?.getRandomValues) {
-    throw new Error("Este navegador no permite generar códigos seguros.");
-  }
-  globalThis.crypto.getRandomValues(bytes);
-  return Array.from(bytes, (value) => alphabet[value & 31]).join("");
-}
 
 function renderEnrollmentCodes(snapshot) {
   const list = $("#staff-enrollment-code-list");
