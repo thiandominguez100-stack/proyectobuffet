@@ -1,3 +1,15 @@
+if (location.hostname.endsWith(".github.io")) {
+  // Do not authenticate, read, or write Firestore from the GitHub Pages preview.
+  const checkout = document.querySelector("#checkout-open");
+  const feedback = document.querySelector("[data-cart-feedback]");
+  const orders = document.querySelector("#student-orders-list");
+  if (checkout) {
+    checkout.disabled = true;
+    checkout.textContent = "Pedidos disponibles en la versión operativa";
+  }
+  if (feedback) feedback.textContent = "Vista de demostración: el carrito es local y no se guardan pedidos.";
+  if (orders) orders.textContent = "El historial estará disponible en la versión operativa.";
+} else {
 import { auth, db } from "./firebase.js";
 import {
   onIdTokenChanged
@@ -328,3 +340,5 @@ onIdTokenChanged(auth, (user) => {
     console.error("No se pudo preparar el sistema de pedidos:", error);
   });
 });
+
+}
