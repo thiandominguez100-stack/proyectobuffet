@@ -1,3 +1,20 @@
+if (location.hostname.endsWith(".github.io")) {
+  // GitHub Pages is only a static preview; never collect credentials or profile data here.
+  const gate = document.querySelector("#student-auth-gate");
+  const app = document.querySelector("#student-app");
+  const footer = document.querySelector("#student-footer");
+  const account = document.querySelector("#student-account");
+  if (gate) gate.hidden = true;
+  if (app) {
+    app.hidden = false;
+    const notice = document.createElement("section");
+    notice.className = "preview-banner wrap";
+    notice.innerHTML = "<strong>Vista de demostración</strong><p>Esta dirección solo muestra el diseño. No ingreses contraseñas ni datos personales y no se envían pedidos. La versión operativa se publicará en Firebase Hosting.</p>";
+    app.prepend(notice);
+  }
+  if (footer) footer.hidden = false;
+  if (account) account.hidden = true;
+} else {
 import { auth, db } from "./firebase.js";
 import {
   createUserWithEmailAndPassword,
@@ -481,3 +498,5 @@ onAuthStateChanged(auth, (user) => {
   }
   loadStudentSession(user);
 });
+
+}
