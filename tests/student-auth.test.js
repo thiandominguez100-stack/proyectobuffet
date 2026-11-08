@@ -19,6 +19,12 @@ test("el registro crea únicamente perfiles con rol de alumno", () => {
   assert.match(rules, /request\.resource\.data\.active == true/);
 });
 
+test("el perfil de Firestore no duplica el correo de autenticación", () => {
+  const userCreateRule = rules.slice(rules.indexOf("match /users/{uid}"), rules.indexOf("match /profilePhotos/{uid}"));
+  assert.doesNotMatch(userCreateRule, /request\.resource\.data\.email/);
+  assert.doesNotMatch(auth, /email: newUser\.email/);
+});
+
 test("el alumno solo puede cambiar su nombre para mostrar", () => {
   assert.match(rules, /hasOnly\(\['displayName', 'updatedAt'\]\)/);
 });
