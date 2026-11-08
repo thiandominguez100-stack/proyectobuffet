@@ -100,7 +100,7 @@ function calendarDateKey(value) {
 function prepareServiceDate(entries = schoolDayEntries) {
   const openDates = entries.filter((entry) => entry.open).map((entry) => calendarDateKey(entry.dateNumber));
   const closedDates = entries.filter((entry) => !entry.open).map((entry) => calendarDateKey(entry.dateNumber));
-  serviceDateKey = getNextSchoolDate(new Date(), { openDates, closedDates });
+  serviceDateKey = getNextSchoolDate(new Date(), { openDates, closedDates, maxDays: 7 });
   serviceDateNumber = getDateNumber(serviceDateKey);
   const at = getArgentinaMidnightTimestamp(serviceDateKey);
   $("#checkout-service-date").textContent = new Intl.DateTimeFormat("es-AR", {
