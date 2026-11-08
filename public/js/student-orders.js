@@ -1,4 +1,4 @@
-if (location.hostname.endsWith(".github.io")) {
+if (location.hostname !== "buffet411-f80af.web.app") {
   // Do not authenticate, read, or write Firestore from the GitHub Pages preview.
   const checkout = document.querySelector("#checkout-open");
   const feedback = document.querySelector("[data-cart-feedback]");
