@@ -29,7 +29,7 @@ test("el tema se aplica al cargar, se puede alternar y se guarda", () => {
 });
 
 test("la caché de la aplicación cambia de versión al publicar una corrección", () => {
-  assert.match(serviceWorker, /buffet411-shell-v10/);
+  assert.match(serviceWorker, /buffet411-shell-v11/);
 });
 
 test("el panel solo anuncia pedidos en vivo tras confirmar la conexión remota", async () => {
