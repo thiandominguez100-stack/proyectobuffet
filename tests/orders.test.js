@@ -95,7 +95,7 @@ test("el domingo puede crear pedidos para el lunes y el sábado queda excluido",
 
 
 test("alumnos y personal utilizan las excepciones del calendario escolar", () => {
-  assert.match(orderClient, /onSnapshot\(collection\(db, "schoolDays"/);
+  assert.match(orderClient, /onSnapshot\(getStudentCalendarQuery\(\)/);
   assert.match(orderClient, /getNextSchoolDate\(new Date\(\), \{ openDates, closedDates \}\)/);
   assert.match(staffSource, /getCalendarOptions/);
   assert.match(rules, /schoolDateIsClosed/);
