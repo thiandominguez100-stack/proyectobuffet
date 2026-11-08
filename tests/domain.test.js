@@ -57,11 +57,16 @@ test("rechaza cantidades fraccionarias y productos desconocidos", () => {
   assert.throws(() => addProductToCart(createEmptyCart(), "alfajor", 1), TypeError);
 });
 
-test("el horario de pedidos abre a las 13:00 y cierra al llegar a las 17:00 de Argentina", () => {
-  assert.equal(isOrderWindowOpen(new Date("2026-11-06T15:59:00.000Z")), false); // 12:59 AR
-  assert.equal(isOrderWindowOpen(new Date("2026-11-06T16:00:00.000Z")), true);  // 13:00 AR
-  assert.equal(isOrderWindowOpen(new Date("2026-11-06T19:59:00.000Z")), true);  // 16:59 AR
-  assert.equal(isOrderWindowOpen(new Date("2026-11-06T20:00:00.000Z")), false); // 17:00 AR
+test("el horario abre de domingo a viernes entre las 13:00 y antes de las 17:00 de Argentina, pero no el sábado", () => {
+  assert.equal(isOrderWindowOpen(new Date("2026-11-06T15:59:00.000Z")), false); // viernes 12:59 AR
+  assert.equal(isOrderWindowOpen(new Date("2026-11-06T16:00:00.000Z")), true);  // viernes 13:00 AR
+  assert.equal(isOrderWindowOpen(new Date("2026-11-06T19:59:00.000Z")), true);  // viernes 16:59 AR
+  assert.equal(isOrderWindowOpen(new Date("2026-11-06T20:00:00.000Z")), false); // viernes 17:00 AR
+  assert.equal(isOrderWindowOpen(new Date("2026-11-07T16:00:00.000Z")), false); // sábado 13:00 AR
+  assert.equal(isOrderWindowOpen(new Date("2026-11-08T15:59:00.000Z")), false); // domingo 12:59 AR
+  assert.equal(isOrderWindowOpen(new Date("2026-11-08T16:00:00.000Z")), true);  // domingo 13:00 AR
+  assert.equal(isOrderWindowOpen(new Date("2026-11-08T19:59:00.000Z")), true);  // domingo 16:59 AR
+  assert.equal(isOrderWindowOpen(new Date("2026-11-08T20:00:00.000Z")), false); // domingo 17:00 AR
 });
 
 test("obtiene la fecha local argentina", () => {
