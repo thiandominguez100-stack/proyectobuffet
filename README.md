@@ -46,7 +46,7 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 
 - Registro e inicio de sesión con Firebase Authentication (correo y contraseña).
 - Verificación obligatoria del correo antes de entrar al catálogo.
-- Perfil de Firestore con nombre para mostrar, curso y división.
+- Perfil de Firestore con nombre para mostrar, curso y división; el correo queda únicamente en Firebase Authentication.
 - El alumno solo puede cambiar su nombre para mostrar; curso, división, rol y estado quedan protegidos.
 - Foto elegida desde el dispositivo, procesada localmente y guardada como JPEG cuadrado comprimido en un documento privado de Firestore (máximo 150.000 caracteres).
 - No se utiliza Firebase Storage ni se habilita facturación para las fotos.
