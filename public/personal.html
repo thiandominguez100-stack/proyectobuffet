@@ -71,8 +71,14 @@
       <section class="staff-card staff-enrollment-card" id="staff-enrollment-tools" hidden>
         <div class="card-heading"><div><span class="eyebrow">ALTAS SEGURAS</span><h3>Códigos de inscripción</h3></div><span class="muted-label">SOLO ADMINISTRACIÓN</span></div>
         <p>Generá un código distinto para cada alumno y entregáselo directamente. Cada código permite crear una sola cuenta. No publiques ni compartas la lista en grupos.</p>
-        <button class="button button-primary" id="staff-enrollment-create" type="button">Generar código individual</button>
-        <p class="student-auth-feedback" id="staff-enrollment-feedback" role="status" aria-live="polite">Los códigos disponibles aparecerán acá.</p>
+        <div class="staff-enrollment-controls">
+          <label class="staff-enrollment-count" for="staff-enrollment-quantity">
+            Cantidad de códigos (1 a 300)
+            <input id="staff-enrollment-quantity" name="enrollmentQuantity" type="number" min="1" max="300" step="1" value="25" required>
+          </label>
+          <button class="button button-primary" id="staff-enrollment-create" type="button">Generar lote y descargar CSV</button>
+        </div>
+        <p class="student-auth-feedback" id="staff-enrollment-feedback" role="status" aria-live="polite">Los códigos disponibles aparecerán acá. El CSV contiene solamente códigos, sin nombres ni datos de alumnos.</p>
         <div class="staff-enrollment-list" id="staff-enrollment-code-list"><p class="empty-state compact">No hay códigos disponibles.</p></div>
       </section>
 
