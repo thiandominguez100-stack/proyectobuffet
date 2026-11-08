@@ -122,21 +122,76 @@ service cloud.firestore {
 
     function codeRedemptionMatchesProfile(codeHash) {
       let profilePath = /databases/$(database)/documents/users/$(request.auth.uid);
-      let profile = getAfter(profilePath).data;
       return existsAfter(profilePath)
-        && profile.uid == request.auth.uid
-        && profile.role == 'student'
-        && profile.enrollmentCodeHash == codeHash
-        && profile.course == resource.data.course
-        && profile.division == resource.data.division;
+        && getAfter(profilePath).data.uid == request.auth.uid
+        && getAfter(profilePath).data.role == 'student'
+        && getAfter(profilePath).data.enrollmentCodeHash == codeHash
+        && getAfter(profilePath).data.course == resource.data.course
+        && getAfter(profilePath).data.division == resource.data.division;
     }
 
     function profileHasValidEnrollmentCode(uid, profileData) {
       let codePath = /databases/$(database)/documents/enrollmentCodes/$(profileData.enrollmentCodeHash);
-      let codeBefore = get(codePath).data;
-      let codeAfter = getAfter(codePath).data;
       return profileData.enrollmentCodeHash is string
-        && profileData.enrollmentCodeHash.matches('^[a-f0-9]{64}
+        && profileData.enrollmentCodeHash.size() == 64
+        && profileData.enrollmentCodeHash.matches('^[a-f0-9]+$')
+        && exists(codePath)
+        && get(codePath).data.status == 'available'
+        && get(codePath).data.course == profileData.course
+        && get(codePath).data.division == profileData.division
+        && existsAfter(codePath)
+        && getAfter(codePath).data.status == 'redeemed'
+        && getAfter(codePath).data.redeemedBy == uid
+        && getAfter(codePath).data.redeemedAt == request.time;
+    }
+
+    match /enrollmentCodes/{codeHash} {
+      allow get: if isAdmin()
+        || (signedIn() && resource.data.status == 'available');
+      allow list: if isAdmin();
+
+      allow create: if isAdmin()
+        && codeHash.size() == 64
+        && codeHash.matches('^[a-f0-9]+$')
+        && request.resource.data.keys().hasOnly([
+          'status', 'course', 'division', 'createdBy', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'status', 'course', 'division', 'createdBy', 'createdAt'
+        ])
+        && request.resource.data.status == 'available'
+        && request.resource.data.course is string
+        && request.resource.data.course.size() >= 1
+        && request.resource.data.course.size() <= 12
+        && request.resource.data.division is string
+        && request.resource.data.division.size() >= 1
+        && request.resource.data.division.size() <= 8
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if (
+        isAdmin()
+        && resource.data.status == 'available'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'revokedBy', 'revokedAt'
+        ])
+        && request.resource.data.status == 'revoked'
+        && request.resource.data.revokedBy == request.auth.uid
+        && request.resource.data.revokedAt == request.time
+      ) || (
+        signedIn()
+        && resource.data.status == 'available'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'redeemedBy', 'redeemedAt'
+        ])
+        && request.resource.data.status == 'redeemed'
+        && request.resource.data.redeemedBy == request.auth.uid
+        && request.resource.data.redeemedAt == request.time
+        && codeRedemptionMatchesProfile(codeHash)
+      );
+
+      allow delete: if false;
+    }
 
     match /users/{uid} {
       allow get: if (signedIn() && request.auth.uid == uid) || isStaff();
