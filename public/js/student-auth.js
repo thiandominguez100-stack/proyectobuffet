@@ -30,7 +30,7 @@ if (location.hostname.endsWith(".github.io")) {
     doc,
     getDoc,
     serverTimestamp,
-    setDoc,
+    runTransaction,
     updateDoc,
     writeBatch
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
@@ -227,10 +227,15 @@ registerForm.addEventListener("submit", async (event) => {
   const course = $("#student-register-course").value.trim();
   const division = $("#student-register-division").value.trim();
   const email = $("#student-register-email").value.trim();
+  const registrationCode = $("#student-register-code").value.trim().toUpperCase();
   const password = $("#student-register-password").value;
   const confirmation = $("#student-register-confirm").value;
   if (displayName.length < 2 || displayName.length > 32 || !course || !division) {
     showFeedback("Completá nombre, curso y división correctamente.", "error");
+    return;
+  }
+  if (!/^[A-HJ-NP-Z2-9]{16}$/.test(registrationCode)) {
+    showFeedback("Ingresá el código de inscripción de 16 caracteres que te entregó el buffet.", "error");
     return;
   }
   if (password.length < 8) {
@@ -250,15 +255,30 @@ registerForm.addEventListener("submit", async (event) => {
   try {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     newUser = credential.user;
-    await setDoc(doc(db, "users", newUser.uid), {
-      uid: newUser.uid,
-      displayName,
-      course,
-      division,
-      role: "student",
-      active: true,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+    await runTransaction(db, async (transaction) => {
+      const codeRef = doc(db, "enrollmentCodes", registrationCode);
+      const codeSnapshot = await transaction.get(codeRef);
+      if (!codeSnapshot.exists() || codeSnapshot.data().status !== "available") {
+        throw new Error("ENROLLMENT_CODE_INVALID");
+      }
+
+      const userRef = doc(db, "users", newUser.uid);
+      transaction.set(userRef, {
+        uid: newUser.uid,
+        displayName,
+        course,
+        division,
+        registrationCodeId: registrationCode,
+        role: "student",
+        active: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      transaction.update(codeRef, {
+        status: "used",
+        usedBy: newUser.uid,
+        usedAt: serverTimestamp()
+      });
     });
     showVerificationPanel();
     try {
@@ -277,8 +297,8 @@ registerForm.addEventListener("submit", async (event) => {
         ? "Ingresá una dirección de correo válida."
         : error.code === "auth/weak-password"
           ? "Elegí una contraseña más segura, de al menos 8 caracteres."
-          : error.code === "permission-denied"
-            ? "Firebase no permitió guardar el perfil. Revisaremos las reglas."
+          : error.message === "ENROLLMENT_CODE_INVALID" || error.code === "permission-denied"
+            ? "El código no existe, ya fue utilizado o no está habilitado. Pedí uno al personal del buffet."
             : "No se pudo crear la cuenta. Revisá los datos e intentá nuevamente.";
     showAuthMode("register");
     showFeedback(message, "error");
