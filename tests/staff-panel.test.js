@@ -47,7 +47,7 @@ test("el panel calcula saldos por efectivo, Mercado Pago y pagos confirmados", (
 
 
 test("el calendario permite cargar excepciones y distingue controles administrativos", () => {
-  assert.match(page, /id="staff-calendar-form" hidden/);
+  assert.match(page, /<form id="staff-calendar-form"[^>]*hidden>/);
   assert.match(page, /id="staff-calendar-date"/);
   assert.match(page, /id="staff-calendar-open"/);
   assert.match(staff, /currentAuthorizedRole !== "admin"/);
