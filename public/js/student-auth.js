@@ -19,7 +19,6 @@ if (location.hostname.endsWith(".github.io")) {
   const {
     createUserWithEmailAndPassword,
     deleteUser,
-    getIdToken,
     onAuthStateChanged,
     reload,
     sendEmailVerification,
@@ -131,12 +130,10 @@ async function loadStudentSession(user) {
   authGate.hidden = false;
   accountBar.hidden = true;
   try {
-    await reload(user);
-    if (loadToken !== sessionLoadToken || !auth.currentUser) return;
+    // El observador de Firebase ya entrega el estado de autenticación vigente.
+    // Solo se recarga el usuario al pulsar «Ya confirmé mi correo».
     const currentUser = auth.currentUser;
-    // Actualiza el token para que Firestore reciba el claim email_verified recién confirmado.
-    await getIdToken(currentUser, true);
-    if (loadToken !== sessionLoadToken || !auth.currentUser) return;
+    if (!currentUser || currentUser.uid !== user.uid) return;
     if (!currentUser.emailVerified) {
       showVerificationPanel();
       return;
@@ -156,10 +153,18 @@ async function loadStudentSession(user) {
       return;
     }
 
-    const photoSnapshot = await getDoc(doc(db, "profilePhotos", currentUser.uid));
+    // La foto es opcional: un fallo al leerla no debe expulsar al alumno del catálogo.
+    let photoData = "";
+    try {
+      const photoSnapshot = await getDoc(doc(db, "profilePhotos", currentUser.uid));
+      if (photoSnapshot.exists()) photoData = photoSnapshot.data().photoData || "";
+    } catch (photoError) {
+      console.warn("No se pudo cargar la foto de perfil; se mostrará el avatar inicial:", photoError);
+    }
     if (loadToken !== sessionLoadToken || !auth.currentUser) return;
+
     activeProfile = profile;
-    activePhotoData = photoSnapshot.exists() ? photoSnapshot.data().photoData : "";
+    activePhotoData = photoData;
     authGate.hidden = true;
     studentApp.hidden = false;
     studentFooter.hidden = false;
@@ -170,8 +175,11 @@ async function loadStudentSession(user) {
   } catch (error) {
     console.error("No se pudo cargar el perfil del alumno:", error);
     if (loadToken !== sessionLoadToken) return;
-    await signOut(auth).catch(() => {});
-    showSignedOut("No pudimos validar tu perfil. Revisá la conexión e intentá nuevamente.", "error");
+    // Un error temporal de red o permisos no invalida por sí solo la sesión.
+    const detail = error.code === "permission-denied"
+      ? "Firebase no permitió consultar tu perfil. Tu sesión sigue abierta; revisaremos los permisos del perfil."
+      : "No pudimos comprobar tu perfil por un problema de conexión. Tu sesión sigue abierta.";
+    showSignedOut(detail + " Tocá «Ingresar» para volver a intentar.", "error");
   }
 }
 
@@ -185,12 +193,20 @@ loginForm.addEventListener("submit", async (event) => {
   submit.disabled = true;
   showFeedback("Ingresando…");
   try {
-    await signInWithEmailAndPassword(
-      auth,
-      $("#student-login-email").value.trim(),
-      $("#student-login-password").value
-    );
-    // onAuthStateChanged valida correo, perfil y rol antes de mostrar el catálogo.
+    const email = $("#student-login-email").value.trim();
+    if (auth.currentUser && auth.currentUser.email === email) {
+      // Si la sesión sigue abierta pero falló una lectura temporal, reintenta sin
+      // obligar al alumno a iniciar sesión una y otra vez.
+      await loadStudentSession(auth.currentUser);
+    } else {
+      if (auth.currentUser) await signOut(auth);
+      const credential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        $("#student-login-password").value
+      );
+      await loadStudentSession(credential.user);
+    }
   } catch (error) {
     const message = error.code === "auth/invalid-credential"
       ? "El correo o la contraseña no son correctos."
