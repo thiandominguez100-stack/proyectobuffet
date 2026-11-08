@@ -67,3 +67,15 @@ test("un fallo temporal al validar el perfil no cierra automáticamente la sesi�
   assert.match(catchBlock, /Tu sesión sigue abierta/);
   assert.match(auth, /await loadStudentSession\(auth\.currentUser\)/);
 });
+
+
+test("el registro comprueba el perfil antes de borrar una cuenta tras un error de red", () => {
+  const start = auth.indexOf('registerForm.addEventListener("submit"');
+  const end = auth.indexOf('$("#student-forgot-password")', start);
+  const registration = auth.slice(start, end);
+  assert.match(registration, /const existingProfile = await getDoc\(doc\(db, "users", newUser\.uid\)\)/);
+  assert.match(registration, /preserveAccount = existingProfile\.exists\(\)/);
+  assert.match(registration, /if \(!preserveAccount && !existingProfile\.exists\(\)\)/);
+  assert.match(registration, /if \(profileCheckFailed\)/);
+  assert.match(registration, /await sendEmailVerification\(newUser\)/);
+});
