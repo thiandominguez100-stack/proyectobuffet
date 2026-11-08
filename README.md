@@ -59,9 +59,9 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 
 ## Estado actual
 
-El proyecto Firebase `buffet411-f80af` ya tiene una app web registrada y una base Cloud Firestore Standard creada. Authentication utiliza correo y contraseña. Las reglas permiten que cada alumno lea su propio perfil, cree un perfil con rol fijo `student`, edite únicamente su nombre para mostrar y gestione su foto privada. Los pedidos y ajustes operativos siguen bloqueados hasta implementar sus reglas específicas.
+El proyecto Firebase `buffet411-f80af` ya tiene una app web registrada y una base Cloud Firestore Standard creada. Authentication utiliza correo y contraseña. Las reglas de perfiles y fotos están publicadas y las reglas para pedidos se prepararon en `firestore.rules`, pero todavía deben publicarse en Firebase Console. El código ya guarda pedidos y contadores de cinco unidades en una transacción y conecta la vista de personal; no se debe probar con pedidos reales hasta publicar y validar las reglas de pedidos.
 
-**No usar con cuentas reales ni publicar como operativo** hasta terminar las reglas de seguridad, las pruebas y la revisión de permisos.
+**No usar con cuentas reales ni publicar como operativo** hasta publicar las reglas de pedidos, comprobarlas en Firebase, completar la integración con calendario y stock, y obtener autorización de la escuela.
 
 ## Privacidad
 
