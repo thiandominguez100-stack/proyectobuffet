@@ -190,3 +190,12 @@
 .staff-enrollment-count input{width:100%;min-height:42px;padding:9px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);font:inherit}
 .staff-enrollment-count input:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 @media(max-width:560px){.staff-enrollment-controls{align-items:stretch;flex-direction:column}.staff-enrollment-count{max-width:none}.staff-enrollment-controls>.button{width:100%}}
+
+
+.payment-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.payment-summary-grid article{display:grid;gap:6px;min-width:0;padding:13px;background:var(--surface-2);border:1px solid var(--line)}
+.payment-summary-grid article>span{font-size:8px;font-weight:800;letter-spacing:.7px;color:var(--muted)}
+.payment-summary-grid article>strong{font-size:19px;letter-spacing:-.5px}
+.payment-summary-grid article>small{font-size:9px;color:var(--muted)}
+.payment-summary-grid .button{width:100%;min-height:34px;padding-inline:8px;font-size:10px}
+@media(max-width:650px){.payment-summary-grid{grid-template-columns:1fr}}
