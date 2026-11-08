@@ -12,27 +12,35 @@ import {
 (function () {
   "use strict";
 
-  // student-auth.js administra el acceso y los perfiles con Firebase.
-  // Este módulo mantiene el carrito local; student-orders.js lo guarda de forma transaccional en Firestore.
-  if (auth && db) {
-    document.documentElement.setAttribute("data-firebase", "initialized");
+  // Firebase se inicializa en los módulos de autenticación y pedidos.
+  // Este módulo compartido solo gestiona tema, horario y carrito en ambas páginas.
+  var root = document.documentElement;
+  var themeButtons = document.querySelectorAll("[data-toggle-theme]");
+
+  function applyTheme(theme) {
+    root.setAttribute("data-theme", theme);
+    themeButtons.forEach(function (button) {
+      var nextTheme = theme === "dark" ? "light" : "dark";
+      var label = nextTheme === "dark" ? "Activar modo oscuro" : "Activar modo claro";
+      button.setAttribute("aria-label", label);
+      button.setAttribute("title", label);
+      button.setAttribute("aria-pressed", String(theme === "dark"));
+      button.textContent = theme === "dark" ? "☀" : "☾";
+    });
   }
 
-  var root = document.documentElement;
   var savedTheme = null;
   try {
     savedTheme = localStorage.getItem("b411-theme");
   } catch (error) {
     savedTheme = null;
   }
-  if (savedTheme === "dark" || savedTheme === "light") {
-    root.setAttribute("data-theme", savedTheme);
-  }
+  applyTheme(savedTheme === "dark" ? "dark" : "light");
 
-  document.querySelectorAll("[data-toggle-theme]").forEach(function (button) {
+  themeButtons.forEach(function (button) {
     button.addEventListener("click", function () {
       var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
-      root.setAttribute("data-theme", next);
+      applyTheme(next);
       try {
         localStorage.setItem("b411-theme", next);
       } catch (error) {
