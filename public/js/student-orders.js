@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase.js";
 import {
-  onAuthStateChanged
+  onIdTokenChanged
 } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js";
 import {
   collection,
@@ -316,11 +316,14 @@ checkoutForm.addEventListener("submit", async (event) => {
   }
 });
 
-onAuthStateChanged(auth, (user) => {
+onIdTokenChanged(auth, (user) => {
   const token = ++authLoadToken;
   stopStudentListeners();
   studentProfile = null;
-  if (!user) return;
+  if (!user) {
+    document.dispatchEvent(new CustomEvent("b411:clear-cart"));
+    return;
+  }
   connectStudent(user, token).catch((error) => {
     console.error("No se pudo preparar el sistema de pedidos:", error);
   });
