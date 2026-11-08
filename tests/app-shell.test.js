@@ -2,11 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [app, studentPage, staffPage, serviceWorker] = await Promise.all([
+const [app, studentPage, staffPage, serviceWorker, hostingConfig] = await Promise.all([
   readFile(new URL("../public/js/app.js", import.meta.url), "utf8"),
   readFile(new URL("../public/index.html", import.meta.url), "utf8"),
   readFile(new URL("../public/personal.html", import.meta.url), "utf8"),
-  readFile(new URL("../public/sw.js", import.meta.url), "utf8")
+  readFile(new URL("../public/sw.js", import.meta.url), "utf8"),
+  readFile(new URL("../firebase.json", import.meta.url), "utf8")
 ]);
 
 test("el módulo principal no se bloquea por referencias Firebase no importadas", () => {
@@ -48,4 +49,16 @@ test("el manifiesto PWA incluye iconos PNG de 192 y 512 y uno maskable para Andr
   assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "any"));
   assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable"));
   assert.match(serviceWorker, /\.\/icons\/icon-512\.png/);
+});
+
+
+test("Firebase Hosting publica cabeceras HTTP de seguridad", () => {
+  const config = JSON.parse(hostingConfig);
+  const headers = config.hosting.headers.flatMap((entry) => entry.headers);
+  const value = (name) => headers.find((header) => header.key.toLowerCase() === name.toLowerCase())?.value;
+  assert.equal(value("X-Content-Type-Options"), "nosniff");
+  assert.equal(value("X-Frame-Options"), "DENY");
+  assert.equal(value("Referrer-Policy"), "strict-origin-when-cross-origin");
+  assert.match(value("Permissions-Policy"), /camera=\(\)/);
+  assert.match(value("Strict-Transport-Security"), /max-age=31536000/);
 });
