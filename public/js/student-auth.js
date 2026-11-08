@@ -2,6 +2,7 @@ import { auth, db } from "./firebase.js";
 import {
   createUserWithEmailAndPassword,
   deleteUser,
+  getIdToken,
   onAuthStateChanged,
   reload,
   sendEmailVerification,
@@ -116,6 +117,9 @@ async function loadStudentSession(user) {
     await reload(user);
     if (loadToken !== sessionLoadToken || !auth.currentUser) return;
     const currentUser = auth.currentUser;
+    // Actualiza el token para que Firestore reciba el claim email_verified recién confirmado.
+    await getIdToken(currentUser, true);
+    if (loadToken !== sessionLoadToken || !auth.currentUser) return;
     if (!currentUser.emailVerified) {
       showVerificationPanel();
       return;
