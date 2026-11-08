@@ -89,7 +89,7 @@ test("el domingo puede crear pedidos para el lunes y el sábado queda excluido",
   assert.match(rules, /request\.time\.dayOfWeek\(\) < 6 \|\| request\.time\.dayOfWeek\(\) == 7/);
   assert.match(rules, /function schoolDateIsOpen/);
   assert.match(rules, /function schoolDateIsClosed/);
-  assert.match(rules, /dateAt\.date\(\) == day1\.date\(\)/);
+  assert.match(rules, /sameCalendarDate\(dateAt, day1\)/);
   assert.match(rules, /schoolDateIsClosed\(day1\)/);
 });
 
