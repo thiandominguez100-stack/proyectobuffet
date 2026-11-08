@@ -34,8 +34,14 @@
         <input id="staff-email" name="email" type="email" autocomplete="username" required>
         <label for="staff-password">Contraseña</label>
         <input id="staff-password" name="password" type="password" autocomplete="current-password" minlength="8" required>
-        <button class="button button-primary" id="staff-login-submit" type="submit">Ingresar</button>
+        <button class="button button-primary" id="staff-login-submit" type="submit">Verificar acceso</button>
       </form>
+      <div class="staff-authorized-step" id="staff-authorized-step" hidden>
+        <span class="staff-authorized-icon" aria-hidden="true">✓</span>
+        <h2>Identidad verificada</h2>
+        <p>Tu cuenta tiene permisos de personal. Entrá al panel cuando estés listo.</p>
+        <button class="button button-primary" id="staff-enter-panel" type="button">Ingresar al panel</button>
+      </div>
       <p class="staff-auth-message" id="staff-auth-message" role="status" aria-live="polite">Solo pueden ingresar cuentas con rol de personal o administrador.</p>
       <a class="button button-quiet" href="./index.html">← Volver a alumnos</a>
     </div>
@@ -60,7 +66,7 @@
     <section class="staff-main">
       <div class="staff-heading" id="resumen"><div><span class="eyebrow">PANEL OPERATIVO</span><h2>Resumen de producción</h2><p>Vista inicial del área de personal.</p></div><span class="prototype-badge"><i></i> PROTOTIPO</span></div>
 
-      <div class="security-notice"><span class="notice-icon">!</span><div><strong>Panel todavía no habilitado</strong><p>La autenticación y los permisos del personal todavía no están conectados. Esta pantalla es una maqueta visual: no muestra pedidos reales ni permite realizar cambios.</p></div></div>
+      <div class="security-notice"><span class="notice-icon">!</span><div><strong>Panel de demostración</strong><p>El acceso del personal ya está protegido. Las funciones de pedidos, producción y pagos todavía no están conectadas a datos reales.</p></div></div>
 
       <div class="staff-stats">
         <article class="stat-card"><span>PRÓXIMA JORNADA</span><strong>—</strong><small>Se calculará con el calendario escolar</small></article>
@@ -88,7 +94,7 @@
         <section class="staff-card" id="calendario"><div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div><div class="empty-state compact"><span>▦</span><strong>Calendario editable</strong><p>Se podrán marcar feriados, vacaciones y días sin clases.</p></div></section>
         <section class="staff-card" id="pagos"><div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div><div class="empty-state compact"><span>$</span><strong>Verificación manual</strong><p>El personal podrá confirmar efectivo o Mercado Pago.</p></div></section>
       </div>
-      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>El acceso real se habilitará después de configurar los roles y reglas de seguridad.</span></div>
+      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Acceso verificado. Las funciones operativas se incorporarán en próximas etapas.</span></div>
     </section>
   </main>
   <footer class="site-footer wrap"><span>Buffet 411 · Panel interno</span><span class="footer-status"><i></i> Prototipo visual</span></footer>
