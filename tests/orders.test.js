@@ -43,7 +43,7 @@ test("los pedidos y el contador diario se guardan en la misma transacción", () 
 test("las reglas imponen un máximo combinado de cinco unidades por fecha y alumno", () => {
   assert.match(rules, /request\.resource\.data\.quantity <= 5/);
   assert.match(rules, /afterTotal\.quantity <= 5/);
-  assert.match(rules, /afterTotal\\.quantity == oldQuantity \\+ data\\.quantity/);
+  assert.ok(rules.includes("afterTotal.quantity == oldQuantity + data.quantity"));
   assert.match(rules, /dailyTotalId == request\.auth\.uid \+ '_' \+ string\(request\.resource\.data\.serviceDateNumber\)/);
 });
 
