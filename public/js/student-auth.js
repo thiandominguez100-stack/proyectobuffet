@@ -377,14 +377,27 @@ function blobToDataUrl(blob) {
 }
 
 async function compressProfilePhoto(file) {
-  if (!("createImageBitmap" in window)) {
-    throw new Error("Este navegador no admite el procesamiento de imágenes requerido.");
-  }
-  const bitmap = await createImageBitmap(file);
+  let bitmap = null;
+  let fallbackUrl = null;
   try {
-    const side = Math.min(bitmap.width, bitmap.height);
-    const sx = Math.floor((bitmap.width - side) / 2);
-    const sy = Math.floor((bitmap.height - side) / 2);
+    if ("createImageBitmap" in window) {
+      bitmap = await createImageBitmap(file);
+    } else {
+      // Compatibilidad con navegadores que todavía no implementan createImageBitmap.
+      fallbackUrl = URL.createObjectURL(file);
+      bitmap = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("No pudimos abrir esa imagen."));
+        image.src = fallbackUrl;
+      });
+    }
+
+    const width = bitmap.width || bitmap.naturalWidth;
+    const height = bitmap.height || bitmap.naturalHeight;
+    const side = Math.min(width, height);
+    const sx = Math.floor((width - side) / 2);
+    const sy = Math.floor((height - side) / 2);
     for (const size of [512, 448, 384, 320]) {
       const canvas = document.createElement("canvas");
       canvas.width = size;
@@ -403,7 +416,8 @@ async function compressProfilePhoto(file) {
     }
     throw new Error("La imagen no se pudo comprimir lo suficiente. Probá con otra foto.");
   } finally {
-    bitmap.close();
+    if (bitmap && typeof bitmap.close === "function") bitmap.close();
+    if (fallbackUrl) URL.revokeObjectURL(fallbackUrl);
   }
 }
 
@@ -425,15 +439,16 @@ profileForm.addEventListener("submit", async (event) => {
       const batch = writeBatch(db);
       batch.update(userRef, { displayName, updatedAt: serverTimestamp() });
       const photoRef = doc(db, "profilePhotos", uid);
+      let nextPhotoData = activePhotoData;
       if (selectedPhotoFile) {
-        const photoData = await compressProfilePhoto(selectedPhotoFile);
-        batch.set(photoRef, { photoData, updatedAt: serverTimestamp() });
-        activePhotoData = photoData;
+        nextPhotoData = await compressProfilePhoto(selectedPhotoFile);
+        batch.set(photoRef, { photoData: nextPhotoData, updatedAt: serverTimestamp() });
       } else if (removeCurrentPhoto) {
+        nextPhotoData = "";
         batch.delete(photoRef);
-        activePhotoData = "";
       }
       await batch.commit();
+      activePhotoData = nextPhotoData;
     } else {
       await updateDoc(userRef, { displayName, updatedAt: serverTimestamp() });
     }
