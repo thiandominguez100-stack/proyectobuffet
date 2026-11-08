@@ -174,17 +174,28 @@ function renderEnrollmentCodes(snapshot) {
   }
 }
 
-function downloadEnrollmentCodesCsv(codes) {
+function escapeCsvCell(value) {
+  const text = String(value ?? "");
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+
+function downloadEnrollmentCodesCsv(codes, course, division) {
   if (!Array.isArray(codes) || !codes.length) {
     throw new Error("No hay códigos guardados para descargar.");
   }
   const newline = String.fromCharCode(13, 10);
-  const csv = "\uFEFFCódigo de inscripción" + newline + codes.join(newline) + newline;
+  const rows = [
+    ["Código de inscripción", "Curso", "División"].map(escapeCsvCell).join(","),
+    ...codes.map((code) => [code, course, division].map(escapeCsvCell).join(","))
+  ];
+  const csv = "\uFEFF" + rows.join(newline) + newline;
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
+  const safeCourse = course.toLocaleLowerCase("es").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "curso";
+  const safeDivision = division.toLocaleLowerCase("es").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "division";
   const link = document.createElement("a");
   link.href = url;
-  link.download = "buffet411-codigos-inscripcion.csv";
+  link.download = "buffet411-codigos-" + safeCourse + "-" + safeDivision + ".csv";
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -270,7 +281,7 @@ function startEnrollmentCodeManager(user) {
 
     if (savedCodes.length) {
       try {
-        downloadEnrollmentCodesCsv(savedCodes);
+        downloadEnrollmentCodesCsv(savedCodes, course, division);
       } catch (downloadError) {
         console.error("No se pudo descargar el CSV:", downloadError);
         $("#staff-enrollment-feedback").textContent =
