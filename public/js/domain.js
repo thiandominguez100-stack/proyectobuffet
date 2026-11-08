@@ -111,7 +111,10 @@ export function getArgentinaMinutes(date = new Date()) {
 
 export function isOrderWindowOpen(date = new Date()) {
   const minutes = getArgentinaMinutes(date);
-  return minutes >= 13 * 60 && minutes < 17 * 60;
+  const { year, month, day } = getArgentinaDateParts(date);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  // Se permiten pedidos de domingo a viernes; sábado queda cerrado.
+  return weekday !== 6 && minutes >= 13 * 60 && minutes < 17 * 60;
 }
 
 export function getNextSchoolDate(date = new Date(), options = {}) {
