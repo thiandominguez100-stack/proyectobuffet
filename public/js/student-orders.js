@@ -229,6 +229,21 @@ function currentCartFitsAvailability(cart = currentCart) {
   });
 }
 
+function getStudentCalendarQuery() {
+  const todayKey = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Cordoba",
+    year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+  const [year, month, day] = todayKey.split("-").map(Number);
+  const endDate = new Date(Date.UTC(year, month - 1, day + 7));
+  const endKey = endDate.toISOString().slice(0, 10);
+  return query(
+    collection(db, "schoolDays"),
+    where("dateNumber", ">=", getDateNumber(todayKey)),
+    where("dateNumber", "<=", getDateNumber(endKey))
+  );
+}
+
 function listenForDailyAvailability(token) {
   if (stopAvailability) stopAvailability();
   const availabilityRef = doc(db, "dailyAvailability", String(serviceDateNumber));
@@ -309,7 +324,7 @@ async function connectStudent(user, token) {
     }
   );
 
-  stopSchoolDays = onSnapshot(collection(db, "schoolDays"), (snapshot) => {
+  stopSchoolDays = onSnapshot(getStudentCalendarQuery(), (snapshot) => {
     if (token !== authLoadToken) return;
     const previousServiceDate = serviceDateNumber;
     schoolDayEntries = snapshot.docs.map((item) => ({
