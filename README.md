@@ -63,7 +63,7 @@ El proyecto Firebase `buffet411-f80af` tiene Hosting y Authentication activos, y
 
 El guardado de pedidos todavía necesita una prueba controlada de extremo a extremo: creación por alumno, aparición en el panel, cambio de estado y actualización de «Mis pedidos». Las pruebas de `npm test` son pruebas locales de lógica/estructura; no sustituyen una prueba con Firebase ni una prueba del emulador.
 
-El calendario escolar editable y el control de stock/precios todavía no están integrados. No abrir el servicio a todos los alumnos hasta completar las pruebas, revisar privacidad/datos y obtener autorización de la escuela. Mantener el proyecto en Firebase Spark; no habilitar Blaze ni servicios pagos sin una decisión expresa del responsable.
+El calendario escolar editable y el control de stock/precios todavía no están integrados. La PWA ya tiene iconos PNG de 192×192 y 512×512, además de un icono maskable de 512×512, preparados para la futura TWA con Bubblewrap. Antes de generar la APK faltará validar la PWA con Bubblewrap, definir los datos Android de la aplicación y comprobar el archivo Digital Asset Links del dominio; se debe conservar cualquier keystore de firma existente para poder actualizar la misma app. No abrir el servicio a todos los alumnos hasta completar las pruebas, revisar privacidad/datos y obtener autorización de la escuela. Mantener el proyecto en Firebase Spark; no habilitar Blaze ni servicios pagos sin una decisión expresa del responsable.
 
 ## Privacidad
 
