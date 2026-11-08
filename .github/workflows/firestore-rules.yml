@@ -25,6 +25,6 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Instalar herramientas de prueba
-        run: npm install --no-save firebase@13.2.0 @firebase/rules-unit-testing@latest firebase-tools@latest
+        run: npm install --no-save firebase@13.2.0 @firebase/rules-unit-testing@6.0.0 firebase-tools@15.35.0
       - name: Ejecutar pruebas reales de reglas en el emulador
         run: npx firebase emulators:exec --only firestore --project demo-buffet411-enrollment "node --test tests/firestore-rules.emulator.mjs"
