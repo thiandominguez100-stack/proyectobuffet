@@ -112,3 +112,11 @@ test("los pedidos validan precios del catálogo y reservan stock en la misma tra
   assert.match(rules, /function validOrderItems/);
   assert.match(rules, /match \/dailyAvailability\/\{dateNumber\}/);
 });
+
+
+test("el checkout exige una nueva confirmación cuando cambia el precio del catálogo", () => {
+  assert.match(orderClient, /checkoutQuotedTotal = currentCartTotal/);
+  assert.match(orderClient, /confirmedTotal !== checkoutQuotedTotal/);
+  assert.match(orderClient, /price-changed/);
+  assert.match(orderClient, /El precio cambió mientras confirmabas/);
+});
