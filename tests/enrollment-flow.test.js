@@ -37,5 +37,7 @@ test("las reglas vinculan el perfil nuevo a un código disponible y lo marcan co
 test("solo el panel de administración muestra la emisión de códigos", () => {
   assert.match(staffPage, /id="staff-enrollment-admin" hidden/);
   assert.match(staff, /currentAuthorizedRole !== "admin"/);
-  assert.match(staff, /writeBatch\(db\)/);\n  assert.match(staff, /enrollmentRevokeButton/);\n  assert.match(staffPage, /id="staff-enrollment-revoke"/);
+  assert.match(staff, /writeBatch\(db\)/);
+  assert.match(staff, /enrollmentRevokeButton/);
+  assert.match(staffPage, /id="staff-enrollment-revoke"/);
 });
