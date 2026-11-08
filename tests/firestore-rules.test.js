@@ -16,6 +16,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where
 } from "firebase/firestore";
 
@@ -81,6 +82,15 @@ test.beforeEach(async () => {
       open: false,
       label: "Cierre de prueba",
       updatedAt: new Date()
+    });
+    await setDoc(doc(db, "dailyAvailability", "20261201"), {
+      dateNumber: 20261201,
+      bizcochosRemaining: 7,
+      facturasRemaining: 10,
+      updatedAt: new Date(),
+      updatedBy: "admin-1",
+      lastOrderId: "order-1",
+      lastAction: "reserved"
     });
   });
 });
@@ -225,6 +235,87 @@ test("solo administración puede enumerar perfiles y códigos", async () => {
   assert.equal(codes.size, 1);
 });
 
+
+test("solo administración puede modificar precios y activar productos", async () => {
+  const adminDb = testEnv.authenticatedContext("admin-1").firestore();
+  const catalog = {
+    products: {
+      bizcochos: { price: 700, active: true },
+      facturas: { price: 1200, active: false }
+    },
+    updatedAt: serverTimestamp(),
+    updatedBy: "admin-1"
+  };
+  await assertSucceeds(setDoc(doc(adminDb, "settings", "catalog"), catalog));
+
+  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
+  await assertFails(setDoc(doc(staffDb, "settings", "catalog"), catalog));
+
+  const studentDb = testEnv.authenticatedContext("student-1", {
+    email_verified: true
+  }).firestore();
+  await assertFails(setDoc(doc(studentDb, "settings", "catalog"), catalog));
+});
+
+test("el personal puede cargar stock y el alumno no puede modificarlo por separado", async () => {
+  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
+  await assertSucceeds(setDoc(doc(staffDb, "dailyAvailability", "20261202"), {
+    dateNumber: 20261202,
+    bizcochosRemaining: 35,
+    facturasRemaining: 20,
+    updatedAt: serverTimestamp(),
+    updatedBy: "staff-1",
+    lastOrderId: "",
+    lastAction: "configured"
+  }));
+
+  const studentDb = testEnv.authenticatedContext("student-1", {
+    email_verified: true
+  }).firestore();
+  await assertFails(updateDoc(doc(studentDb, "dailyAvailability", "20261201"), {
+    bizcochosRemaining: 6,
+    facturasRemaining: 10,
+    updatedAt: serverTimestamp(),
+    updatedBy: "student-1",
+    lastOrderId: "order-1",
+    lastAction: "reserved"
+  }));
+});
+
+test("cancelar un pedido y devolver stock requiere una transacción coordinada", async () => {
+  const staffDb = testEnv.authenticatedContext("staff-1").firestore();
+  const orderRef = doc(staffDb, "orders", "order-1");
+  const stockRef = doc(staffDb, "dailyAvailability", "20261201");
+
+  await assertFails(updateDoc(orderRef, {
+    status: "cancelled",
+    updatedAt: serverTimestamp()
+  }));
+
+  await assertSucceeds(runTransaction(staffDb, async (transaction) => {
+    const orderSnapshot = await transaction.get(orderRef);
+    const stockSnapshot = await transaction.get(stockRef);
+    const order = orderSnapshot.data();
+    const stock = stockSnapshot.data();
+
+    transaction.update(orderRef, {
+      status: "cancelled",
+      updatedAt: serverTimestamp()
+    });
+    transaction.update(stockRef, {
+      bizcochosRemaining: stock.bizcochosRemaining + order.items.bizcochos,
+      facturasRemaining: stock.facturasRemaining + order.items.facturas,
+      updatedAt: serverTimestamp(),
+      updatedBy: "staff-1",
+      lastOrderId: "order-1",
+      lastAction: "released"
+    });
+  }));
+
+  const stockSnapshot = await getDoc(stockRef);
+  assert.equal(stockSnapshot.data().bizcochosRemaining, 10);
+  assert.equal(stockSnapshot.data().facturasRemaining, 10);
+});
 
 test("solo administración puede crear excepciones válidas del calendario escolar", async () => {
   const adminDb = testEnv.authenticatedContext("admin-1").firestore();
