@@ -226,10 +226,13 @@ service cloud.firestore {
 
     match /schoolDays/{dateNumber} {
       allow get, list: if signedIn();
-      allow create, update, delete: if isAdmin()
+      allow create, update: if isAdmin()
         && request.resource.data.keys().hasOnly(['open', 'label', 'updatedAt'])
         && request.resource.data.open is bool
         && request.resource.data.updatedAt is timestamp;
+
+      // La eliminación no tiene request.resource; se autoriza por separado.
+      allow delete: if isAdmin();
     }
 
     match /orders/{orderId} {
