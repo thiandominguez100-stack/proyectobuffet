@@ -22,8 +22,10 @@ test("la fecha de servicio se representa como medianoche argentina", () => {
   assert.equal(getArgentinaMidnightTimestamp("2026-11-09").toISOString(), "2026-11-09T03:00:00.000Z");
 });
 
-test("el siguiente día hábil salta el fin de semana", () => {
+test("el siguiente día hábil salta el fin de semana y cruza correctamente el fin de mes", () => {
   assert.equal(getNextSchoolDate(new Date("2026-11-06T15:00:00.000Z")), "2026-11-09");
+  assert.equal(getNextSchoolDate(new Date("2026-01-30T15:00:00.000Z")), "2026-02-02");
+  assert.equal(getNextSchoolDate(new Date("2026-12-31T15:00:00.000Z")), "2027-01-01");
 });
 
 test("la ventana local de pedidos abre a las 13:00 y cierra antes de las 17:00", () => {
@@ -86,5 +88,7 @@ test("el domingo puede crear pedidos para el lunes y el sábado queda excluido",
   assert.equal(isOrderWindowOpen(new Date("2026-11-07T16:00:00.000Z")), false);
   assert.match(rules, /request\.time\.dayOfWeek\(\) == 7/);
   assert.match(rules, /request\.time\.dayOfWeek\(\) < 6 \|\| request\.time\.dayOfWeek\(\) == 7/);
-  assert.match(rules, /dateAt\.date\(\) == request\.time\.date\(\) \+ duration\.value\(1, 'd'\)/);
+  assert.match(rules, /dateAt > request\.time\s*&& dateAt < request\.time \+ duration\.value\(1, 'd'\)/);
+  assert.match(rules, /dateAt > request\.time \+ duration\.value\(2, 'd'\)/);
+  assert.match(rules, /dateAt\.dayOfWeek\(\) == 1/);
 });
