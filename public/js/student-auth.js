@@ -1,4 +1,4 @@
-if (location.hostname.endsWith(".github.io")) {
+if (location.hostname !== "buffet411-f80af.web.app") {
   // GitHub Pages is only a static preview; never collect credentials or profile data here.
   const gate = document.querySelector("#student-auth-gate");
   const app = document.querySelector("#student-app");
