@@ -21,6 +21,14 @@ Firestore inicia con denegación total de lectura y escritura. Esta política se
 - El rol no puede ser cambiado por el propio usuario desde el navegador.
 - Toda operación crítica debe validarse con reglas de Firestore, no solo con controles visuales.
 
+## Perfiles y fotos
+
+- El perfil del alumno contiene correo, nombre para mostrar, curso, división, rol y estado.
+- El alumno puede cambiar únicamente su nombre para mostrar; no puede cambiar rol, curso, división ni estado.
+- La foto se guarda en `profilePhotos/{uid}`, separada del perfil, como JPEG comprimido de hasta 150.000 caracteres.
+- Las reglas permiten leer o cambiar la foto únicamente a su titular y no permiten enumerar fotos.
+- El archivo original se procesa en el navegador; no se utiliza Firebase Storage.
+
 ## Protección de datos
 
 - No incluir datos reales de alumnos en GitHub.
