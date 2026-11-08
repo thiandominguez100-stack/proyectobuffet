@@ -93,6 +93,14 @@
           <textarea id="staff-enrollment-output" rows="7" readonly spellcheck="false"></textarea>
           <button class="button button-outline" id="staff-enrollment-copy" type="button">Copiar códigos</button>
         </div>
+        <div class="staff-enrollment-revoke">
+          <label for="staff-enrollment-revoke-code">Anular un código que todavía no se utilizó</label>
+          <div>
+            <input id="staff-enrollment-revoke-code" type="text" minlength="16" maxlength="19" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-JKMN-PQRS">
+            <button class="button button-outline" id="staff-enrollment-revoke" type="button">Anular código</button>
+          </div>
+          <small>Un código ya canjeado no se puede reutilizar ni anular.</small>
+        </div>
       </section>
 
       <div class="staff-stats">
