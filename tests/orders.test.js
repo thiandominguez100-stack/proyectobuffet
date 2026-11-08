@@ -71,3 +71,10 @@ test("GitHub Pages no acepta pedidos ni consulta Firestore", async () => {
   assert.match(preview, /checkout\.disabled = true/);
   assert.doesNotMatch(preview, /runTransaction|onSnapshot|firebase\.js/);
 });
+
+
+test("el carrito local nunca habilita checkout desde GitHub Pages", async () => {
+  const app = await readFile(new URL("../public/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /previewOnly = window\.location\.hostname\.endsWith\("\.github\.io"\)/);
+  assert.match(app, /checkoutButton\.disabled = previewOnly \|\| count < 1/);
+});
