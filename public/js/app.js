@@ -70,7 +70,11 @@ import {
     var combinedCount = bookedQuantity + count;
     countTarget.textContent = String(combinedCount);
     totalTarget.textContent = formatARS(calculateCartTotal(cart));
-    if (checkoutButton) checkoutButton.disabled = count < 1;
+    if (checkoutButton) {
+      var previewOnly = window.location.hostname.endsWith(".github.io");
+      checkoutButton.disabled = previewOnly || count < 1;
+      if (previewOnly) checkoutButton.textContent = "Pedidos disponibles en la versión operativa";
+    }
     cartList.replaceChildren();
 
     if (count === 0) {
