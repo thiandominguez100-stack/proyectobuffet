@@ -51,6 +51,12 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 - Foto elegida desde el dispositivo, procesada localmente y guardada como JPEG cuadrado comprimido en un documento privado de Firestore (máximo 150.000 caracteres).
 - No se utiliza Firebase Storage ni se habilita facturación para las fotos.
 
+## Entornos de publicación
+
+- GitHub Pages es solamente una vista estática de demostración: muestra el diseño, mantiene un carrito local de prueba y desactiva registro, inicio de sesión, fotos, lecturas y escrituras de Firestore.
+- El modo operativo se habilita fuera de `github.io`, en Firebase Hosting. No se deben introducir contraseñas ni datos de alumnos en la vista de GitHub Pages.
+- No abrir el servicio a estudiantes reales hasta que la escuela autorice el tratamiento de datos y se termine la validación de reglas.
+
 ## Estado actual
 
 El proyecto Firebase `buffet411-f80af` ya tiene una app web registrada y una base Cloud Firestore Standard creada. Authentication utiliza correo y contraseña. Las reglas permiten que cada alumno lea su propio perfil, cree un perfil con rol fijo `student`, edite únicamente su nombre para mostrar y gestione su foto privada. Los pedidos y ajustes operativos siguen bloqueados hasta implementar sus reglas específicas.
