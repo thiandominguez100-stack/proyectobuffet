@@ -41,3 +41,16 @@ test("los pedidos siguen bloqueados hasta implementar sus propias reglas", () =>
   assert.match(rules, /match \/\{document=\*\*\}/);
   assert.match(rules, /allow read, write: if false/);
 });
+
+
+test("GitHub Pages muestra solo la demo y no carga autenticación", () => {
+  const preview = auth.slice(0, auth.indexOf("} else {"));
+  assert.match(preview, /location\.hostname\.endsWith\("\.github\.io"\)/);
+  assert.match(preview, /Vista de demostración/);
+  assert.doesNotMatch(preview, /signInWithEmailAndPassword|onAuthStateChanged|firebase\.js/);
+});
+
+test("GitHub Pages no inicializa Firebase desde la lógica de catálogo", async () => {
+  const app = await readFile(new URL("../public/js/app.js", import.meta.url), "utf8");
+  assert.doesNotMatch(app, /from ["']\.\/firebase\.js["']/);
+});
