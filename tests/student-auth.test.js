@@ -37,7 +37,10 @@ test("las fotos se guardan aparte y quedan limitadas al propietario", () => {
   assert.match(rules, /allow list: if false/);
 });
 
-test("los pedidos siguen bloqueados hasta implementar sus propias reglas", () => {
+test("los pedidos tienen reglas explícitas y las colecciones desconocidas siguen cerradas", () => {
+  assert.match(rules, /match \/orders\/\{orderId\}/);
+  assert.match(rules, /match \/dailyOrderTotals\/\{totalId\}/);
+  assert.match(rules, /allow list: if isStaff\(\) \|\| \(signedIn\(\) && resource\.data\.uid == request\.auth\.uid\)/);
   assert.match(rules, /match \/\{document=\*\*\}/);
   assert.match(rules, /allow read, write: if false/);
 });
