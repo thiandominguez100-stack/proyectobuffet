@@ -1,4 +1,5 @@
-if (location.hostname !== "buffet411-f80af.web.app") {
+const isLocalEmulator = ["localhost", "127.0.0.1"].includes(location.hostname);
+if (location.hostname !== "buffet411-f80af.web.app" && !isLocalEmulator) {
   // Do not authenticate, read, or write Firestore from the GitHub Pages preview.
   const checkout = document.querySelector("#checkout-open");
   const feedback = document.querySelector("[data-cart-feedback]");
