@@ -1,4 +1,5 @@
-if (location.hostname !== "buffet411-f80af.web.app") {
+const isLocalEmulator = ["localhost", "127.0.0.1"].includes(location.hostname);
+if (location.hostname !== "buffet411-f80af.web.app" && !isLocalEmulator) {
   // GitHub Pages shows the layout only; staff credentials and Firestore remain untouched.
   const authPanel = document.querySelector("#staff-auth");
   const dashboard = document.querySelector("#staff-dashboard");
@@ -204,9 +205,19 @@ function startEnrollmentCodeManager(user) {
 
   const createButton = $("#staff-enrollment-create");
   const quantityInput = $("#staff-enrollment-quantity");
+  const courseInput = $("#staff-enrollment-course");
+  const divisionInput = $("#staff-enrollment-division");
   createButton.onclick = async () => {
     if (!auth.currentUser || auth.currentUser.uid !== user.uid || currentAuthorizedRole !== "admin") {
       $("#staff-enrollment-feedback").textContent = "La sesión administrativa ya no está vigente. Volvé a ingresar.";
+      return;
+    }
+
+    const course = courseInput.value.trim();
+    const division = divisionInput.value.trim();
+    if (!course || course.length > 12 || !division || division.length > 8) {
+      $("#staff-enrollment-feedback").textContent = "Ingresá un curso y una división válidos antes de generar los códigos.";
+      courseInput.focus();
       return;
     }
 
@@ -231,7 +242,9 @@ function startEnrollmentCodeManager(user) {
           batch.set(doc(db, "enrollmentCodes", code), {
             status: "available",
             createdAt: serverTimestamp(),
-            createdBy: user.uid
+            createdBy: user.uid,
+            course,
+            division
           });
         }
         await batch.commit();
