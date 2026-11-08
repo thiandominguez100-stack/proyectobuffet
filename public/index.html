@@ -73,6 +73,11 @@
             <input id="student-register-division" name="division" type="text" maxlength="8" placeholder="Ej. A" required>
           </div>
           <div class="student-form-wide">
+            <label for="student-register-code">Código único de inscripción</label>
+            <input id="student-register-code" name="registrationCode" type="text" minlength="16" maxlength="16" pattern="[A-HJ-NP-Z2-9]{16}" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Código entregado por el buffet" required>
+            <small class="student-form-note">Solicitá tu código al personal del buffet. Cada código se puede usar una sola vez.</small>
+          </div>
+          <div class="student-form-wide">
             <label for="student-register-email">Correo electrónico</label>
             <input id="student-register-email" name="email" type="email" autocomplete="email" placeholder="tu correo electrónico" required>
           </div>
