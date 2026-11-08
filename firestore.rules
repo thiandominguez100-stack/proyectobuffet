@@ -35,6 +35,12 @@ service cloud.firestore {
         && request.time.hours() < 20;
     }
 
+    function sameCalendarDate(left, right) {
+      return left.year() == right.year()
+        && left.month() == right.month()
+        && left.date() == right.date();
+    }
+
     function schoolDateIsOpen(dateAt) {
       let dayNumber = dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day();
       let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dayNumber));
@@ -66,13 +72,13 @@ service cloud.firestore {
         && dateNumber == dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day()
         && (request.time.dayOfWeek() < 6 || request.time.dayOfWeek() == 7)
         && (
-          (dateAt.date() == day1.date() && schoolDateIsOpen(dateAt))
-          || (dateAt.date() == day2.date() && schoolDateIsClosed(day1) && schoolDateIsOpen(dateAt))
-          || (dateAt.date() == day3.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsOpen(dateAt))
-          || (dateAt.date() == day4.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsOpen(dateAt))
-          || (dateAt.date() == day5.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsOpen(dateAt))
-          || (dateAt.date() == day6.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsClosed(day5) && schoolDateIsOpen(dateAt))
-          || (dateAt.date() == day7.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsClosed(day5) && schoolDateIsClosed(day6) && schoolDateIsOpen(dateAt))
+          (sameCalendarDate(dateAt, day1) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day2) && schoolDateIsClosed(day1) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day3) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day4) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day5) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day6) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsClosed(day5) && schoolDateIsOpen(dateAt))
+          || (sameCalendarDate(dateAt, day7) && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsClosed(day5) && schoolDateIsClosed(day6) && schoolDateIsOpen(dateAt))
         );
     }
 
