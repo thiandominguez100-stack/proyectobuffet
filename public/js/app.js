@@ -13,8 +13,8 @@ import {
 (function () {
   "use strict";
 
-  // Firebase queda inicializado, pero no se consultan ni escriben datos
-  // hasta que Auth y las reglas de Firestore estén listas.
+  // student-auth.js administra el acceso y los perfiles con Firebase.
+  // Este módulo conserva el carrito local de demostración; los pedidos reales aún no están habilitados.
   if (auth && db) {
     document.documentElement.setAttribute("data-firebase", "initialized");
   }
