@@ -44,3 +44,13 @@ test("el panel calcula saldos por efectivo, Mercado Pago y pagos confirmados", (
   assert.match(staff, /paymentBuckets/);
   assert.match(staff, /order.paymentStatus !== payment/);
 });
+
+
+test("el calendario permite cargar excepciones y distingue controles administrativos", () => {
+  assert.match(page, /id="staff-calendar-form" hidden/);
+  assert.match(page, /id="staff-calendar-date"/);
+  assert.match(page, /id="staff-calendar-open"/);
+  assert.match(staff, /currentAuthorizedRole !== "admin"/);
+  assert.match(staff, /setDoc\(doc\(db, "schoolDays"/);
+  assert.match(staff, /deleteDoc\(doc\(db, "schoolDays"/);
+});
