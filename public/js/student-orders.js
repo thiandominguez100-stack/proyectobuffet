@@ -9,7 +9,7 @@ if (location.hostname.endsWith(".github.io")) {
   }
   if (feedback) feedback.textContent = "Vista de demostración: el carrito es local y no se guardan pedidos.";
   if (orders) orders.textContent = "El historial estará disponible en la versión operativa.";
-else {
+} else {
   const { auth, db } = await import("./firebase.js");
   const { onIdTokenChanged } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-auth.js");
   const {
