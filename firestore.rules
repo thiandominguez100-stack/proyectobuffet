@@ -79,7 +79,20 @@ service cloud.firestore {
     }
 
     function validOrderItems(data) {
-      return data.items is map
+      let catalogPath = /databases/$(database)/documents/settings/catalog;
+      return exists(catalogPath)
+        && get(catalogPath).data.products is map
+        && get(catalogPath).data.products.keys().hasOnly(['bizcochos', 'facturas'])
+        && get(catalogPath).data.products.keys().hasAll(['bizcochos', 'facturas'])
+        && get(catalogPath).data.products.bizcochos.price is int
+        && get(catalogPath).data.products.bizcochos.price >= 1
+        && get(catalogPath).data.products.bizcochos.price <= 100000
+        && get(catalogPath).data.products.bizcochos.active is bool
+        && get(catalogPath).data.products.facturas.price is int
+        && get(catalogPath).data.products.facturas.price >= 1
+        && get(catalogPath).data.products.facturas.price <= 100000
+        && get(catalogPath).data.products.facturas.active is bool
+        && data.items is map
         && data.items.keys().hasOnly(['bizcochos', 'facturas'])
         && data.items.keys().hasAll(['bizcochos', 'facturas'])
         && data.items.bizcochos is int
@@ -92,8 +105,62 @@ service cloud.firestore {
         && data.quantity >= 1
         && data.quantity <= 5
         && data.quantity == data.items.bizcochos + data.items.facturas
+        && (data.items.bizcochos == 0 || get(catalogPath).data.products.bizcochos.active == true)
+        && (data.items.facturas == 0 || get(catalogPath).data.products.facturas.active == true)
         && data.total is int
-        && data.total == data.items.bizcochos * 500 + data.items.facturas * 1000;
+        && data.total == data.items.bizcochos * get(catalogPath).data.products.bizcochos.price
+          + data.items.facturas * get(catalogPath).data.products.facturas.price;
+    }
+
+    function hasAtomicAvailability(orderId, data) {
+      let stockPath = /databases/$(database)/documents/dailyAvailability/$(string(data.serviceDateNumber));
+      let oldStock = exists(stockPath) ? get(stockPath).data : {};
+      let newStock = existsAfter(stockPath) ? getAfter(stockPath).data : {};
+      return exists(stockPath)
+        && existsAfter(stockPath)
+        && oldStock.dateNumber == data.serviceDateNumber
+        && oldStock.bizcochosRemaining is int
+        && oldStock.facturasRemaining is int
+        && oldStock.bizcochosRemaining >= data.items.bizcochos
+        && oldStock.facturasRemaining >= data.items.facturas
+        && newStock.dateNumber == data.serviceDateNumber
+        && newStock.bizcochosRemaining == oldStock.bizcochosRemaining - data.items.bizcochos
+        && newStock.facturasRemaining == oldStock.facturasRemaining - data.items.facturas
+        && newStock.lastOrderId == orderId
+        && newStock.lastAction == 'reserved'
+        && newStock.updatedBy == request.auth.uid
+        && newStock.updatedAt == request.time;
+    }
+
+    function stockReservationMatchesOrder(dateNumber, newStock) {
+      let orderPath = /databases/$(database)/documents/orders/$(newStock.lastOrderId);
+      let order = existsAfter(orderPath) ? getAfter(orderPath).data : {};
+      return existsAfter(orderPath)
+        && order.uid == request.auth.uid
+        && order.serviceDateNumber == dateNumber
+        && order.status == 'pending'
+        && order.createdAt == request.time
+        && order.items.bizcochos == resource.data.bizcochosRemaining - newStock.bizcochosRemaining
+        && order.items.facturas == resource.data.facturasRemaining - newStock.facturasRemaining
+        && newStock.lastAction == 'reserved'
+        && newStock.updatedBy == request.auth.uid
+        && newStock.updatedAt == request.time;
+    }
+
+    function stockReleaseMatchesOrder(dateNumber, newStock) {
+      let orderPath = /databases/$(database)/documents/orders/$(newStock.lastOrderId);
+      let previousOrder = exists(orderPath) ? get(orderPath).data : {};
+      let cancelledOrder = existsAfter(orderPath) ? getAfter(orderPath).data : {};
+      return exists(orderPath)
+        && existsAfter(orderPath)
+        && previousOrder.status in ['pending', 'accepted']
+        && cancelledOrder.status == 'cancelled'
+        && cancelledOrder.serviceDateNumber == dateNumber
+        && newStock.bizcochosRemaining == resource.data.bizcochosRemaining + previousOrder.items.bizcochos
+        && newStock.facturasRemaining == resource.data.facturasRemaining + previousOrder.items.facturas
+        && newStock.lastAction == 'released'
+        && newStock.updatedBy == request.auth.uid
+        && newStock.updatedAt == request.time;
     }
 
     function hasAtomicDailyTotal(orderId, data) {
@@ -255,6 +322,99 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /settings/{settingId} {
+      allow get: if signedIn() && settingId == 'catalog';
+      allow list: if false;
+      allow create, update: if isAdmin()
+        && settingId == 'catalog'
+        && request.resource.data.keys().hasOnly(['products', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasAll(['products', 'updatedAt', 'updatedBy'])
+        && request.resource.data.products is map
+        && request.resource.data.products.keys().hasOnly(['bizcochos', 'facturas'])
+        && request.resource.data.products.keys().hasAll(['bizcochos', 'facturas'])
+        && request.resource.data.products.bizcochos is map
+        && request.resource.data.products.bizcochos.keys().hasOnly(['price', 'active'])
+        && request.resource.data.products.bizcochos.keys().hasAll(['price', 'active'])
+        && request.resource.data.products.bizcochos.price is int
+        && request.resource.data.products.bizcochos.price >= 1
+        && request.resource.data.products.bizcochos.price <= 100000
+        && request.resource.data.products.bizcochos.active is bool
+        && request.resource.data.products.facturas is map
+        && request.resource.data.products.facturas.keys().hasOnly(['price', 'active'])
+        && request.resource.data.products.facturas.keys().hasAll(['price', 'active'])
+        && request.resource.data.products.facturas.price is int
+        && request.resource.data.products.facturas.price >= 1
+        && request.resource.data.products.facturas.price <= 100000
+        && request.resource.data.products.facturas.active is bool
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+
+    match /dailyAvailability/{dateNumber} {
+      allow get: if signedIn();
+      allow list: if isStaff();
+
+      allow create: if isStaff()
+        && request.resource.data.keys().hasOnly([
+          'dateNumber', 'bizcochosRemaining', 'facturasRemaining',
+          'updatedAt', 'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.keys().hasAll([
+          'dateNumber', 'bizcochosRemaining', 'facturasRemaining',
+          'updatedAt', 'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.dateNumber is int
+        && dateNumber == string(request.resource.data.dateNumber)
+        && request.resource.data.bizcochosRemaining is int
+        && request.resource.data.bizcochosRemaining >= 0
+        && request.resource.data.bizcochosRemaining <= 5000
+        && request.resource.data.facturasRemaining is int
+        && request.resource.data.facturasRemaining >= 0
+        && request.resource.data.facturasRemaining <= 5000
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.lastOrderId == ''
+        && request.resource.data.lastAction == 'configured';
+
+      allow update: if (
+        isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'bizcochosRemaining', 'facturasRemaining', 'updatedAt',
+          'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.dateNumber == resource.data.dateNumber
+        && request.resource.data.bizcochosRemaining is int
+        && request.resource.data.bizcochosRemaining >= 0
+        && request.resource.data.bizcochosRemaining <= 5000
+        && request.resource.data.facturasRemaining is int
+        && request.resource.data.facturasRemaining >= 0
+        && request.resource.data.facturasRemaining <= 5000
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.lastOrderId == ''
+        && request.resource.data.lastAction == 'configured'
+      ) || (
+        activeStudent(request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'bizcochosRemaining', 'facturasRemaining', 'updatedAt',
+          'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.dateNumber == resource.data.dateNumber
+        && stockReservationMatchesOrder(resource.data.dateNumber, request.resource.data)
+      ) || (
+        isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'bizcochosRemaining', 'facturasRemaining', 'updatedAt',
+          'updatedBy', 'lastOrderId', 'lastAction'
+        ])
+        && request.resource.data.dateNumber == resource.data.dateNumber
+        && stockReleaseMatchesOrder(resource.data.dateNumber, request.resource.data)
+      );
+
+      allow delete: if false;
+    }
+
     match /orders/{orderId} {
       // El personal necesita consultar pedidos para organizar la producción y los retiros.
       allow get: if isStaff() || (signedIn() && (resource == null || resource.data.uid == request.auth.uid));
@@ -288,7 +448,8 @@ service cloud.firestore {
         )
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt == request.time
-        && hasAtomicDailyTotal(orderId, request.resource.data);
+        && hasAtomicDailyTotal(orderId, request.resource.data)
+        && hasAtomicAvailability(orderId, request.resource.data);
 
       allow update: if isStaff()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'paymentStatus', 'updatedAt'])
