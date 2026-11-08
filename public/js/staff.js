@@ -38,6 +38,9 @@ const logoutButton = $("#staff-logout");
 let currentAuthorizedUid = null;
 let stopOrdersListener = null;
 let orderActionsBusy = new Set();
+const ORDERS_PAGE_SIZE = 25;
+let allOrders = [];
+let currentPage = 1;
 
 function showMessage(text, kind = "") {
   message.textContent = text;
@@ -49,6 +52,8 @@ function stopStaffOrders() {
   if (stopOrdersListener) stopOrdersListener();
   stopOrdersListener = null;
   orderActionsBusy = new Set();
+  allOrders = [];
+  currentPage = 1;
 }
 
 function showLogin(text = "Solo pueden ingresar cuentas con rol de personal o administrador.", kind = "") {
@@ -185,6 +190,47 @@ function renderOrderCard(order) {
   return card;
 }
 
+function normalizeOrderSearch(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .toLocaleLowerCase("es");
+}
+
+function getFilteredStaffOrders(orders) {
+  const search = normalizeOrderSearch($("#staff-orders-search").value);
+  const slot = $("#staff-orders-slot-filter").value;
+  const status = $("#staff-orders-status-filter").value;
+
+  return orders.filter((order) => {
+    if (status === "active" && order.status === "cancelled") return false;
+    if (status !== "active" && status !== "all" && order.status !== status) return false;
+    if (slot !== "all" && order.pickupSlot !== slot) return false;
+    if (!search) return true;
+
+    const searchableText = normalizeOrderSearch([
+      order.displayName,
+      order.course,
+      order.division,
+      order.id
+    ].join(" "));
+    return searchableText.includes(search);
+  });
+}
+
+function updateOrdersPagination(total) {
+  const totalPages = Math.max(1, Math.ceil(total / ORDERS_PAGE_SIZE));
+  currentPage = Math.min(currentPage, totalPages);
+  const first = total ? (currentPage - 1) * ORDERS_PAGE_SIZE + 1 : 0;
+  const last = Math.min(currentPage * ORDERS_PAGE_SIZE, total);
+
+  $("#staff-orders-page-info").textContent = total
+    ? "Mostrando " + first + "–" + last + " de " + total + " pedidos"
+    : "Sin pedidos para mostrar";
+  $("#staff-orders-page-prev").disabled = currentPage <= 1;
+  $("#staff-orders-page-next").disabled = currentPage >= totalPages;
+}
+
 function renderStaffOrders(orders) {
   const list = $("#staff-orders-list");
   list.replaceChildren();
@@ -210,30 +256,41 @@ function renderStaffOrders(orders) {
   $("#staff-first-facturas").textContent = String(first.facturas);
   $("#staff-last-bizcochos").textContent = String(last.bizcochos);
   $("#staff-last-facturas").textContent = String(last.facturas);
+  $("#staff-orders-status").textContent = activeOrders.length
+    ? activeOrders.length + " PEDIDO(S) ACTIVOS"
+    : "SIN PEDIDOS ACTIVOS";
 
-  if (!activeOrders.length) {
+  const sortedOrders = [...orders].sort((a, b) => {
+    const courseA = (a.course || "") + (a.division || "") + (a.displayName || "");
+    const courseB = (b.course || "") + (b.division || "") + (b.displayName || "");
+    return courseA.localeCompare(courseB, "es", { sensitivity: "base", numeric: true });
+  });
+  const filteredOrders = getFilteredStaffOrders(sortedOrders);
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PAGE_SIZE));
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage - 1) * ORDERS_PAGE_SIZE;
+  const pageOrders = filteredOrders.slice(start, start + ORDERS_PAGE_SIZE);
+
+  if (!pageOrders.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     const icon = document.createElement("span");
     icon.textContent = "≡";
     const heading = document.createElement("strong");
-    heading.textContent = "Todavía no hay pedidos";
+    heading.textContent = orders.length
+      ? "No hay pedidos que coincidan"
+      : "Todavía no hay pedidos";
     const text = document.createElement("p");
-    text.textContent = "Cuando un alumno confirme su encargo, aparecerá acá.";
+    text.textContent = orders.length
+      ? "Probá cambiar la búsqueda o los filtros."
+      : "Cuando un alumno confirme su encargo, aparecerá acá.";
     empty.append(icon, heading, text);
     list.appendChild(empty);
   } else {
-    activeOrders.sort((a, b) => {
-      const courseA = (a.course || "") + (a.division || "") + (a.displayName || "");
-      const courseB = (b.course || "") + (b.division || "") + (b.displayName || "");
-      return courseA.localeCompare(courseB, "es");
-    });
-    activeOrders.forEach((order) => list.appendChild(renderOrderCard(order)));
+    pageOrders.forEach((order) => list.appendChild(renderOrderCard(order)));
   }
 
-  $("#staff-orders-status").textContent = activeOrders.length
-    ? activeOrders.length + " PEDIDO(S)"
-    : "SIN PEDIDOS";
+  updateOrdersPagination(filteredOrders.length);
 }
 
 function setOrdersConnectionState(state, title, description) {
@@ -272,8 +329,8 @@ function startStaffOrders() {
         "La conexión con Firestore está confirmada. Los pedidos y sus estados se actualizan en tiempo real. La administración de stock y calendario se incorporará en la siguiente etapa."
       );
     }
-    const orders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-    renderStaffOrders(orders);
+    allOrders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    renderStaffOrders(allOrders);
   }, (error) => {
     console.error("No se pudieron cargar los pedidos del buffet:", error);
     const permissionDenied = error.code === "permission-denied";
@@ -292,6 +349,32 @@ function startStaffOrders() {
       : "No se pudieron consultar los pedidos. Revisá la conexión e intentá nuevamente.";
   });
 }
+
+
+$("#staff-orders-search").addEventListener("input", () => {
+  currentPage = 1;
+  renderStaffOrders(allOrders);
+});
+
+$("#staff-orders-slot-filter").addEventListener("change", () => {
+  currentPage = 1;
+  renderStaffOrders(allOrders);
+});
+
+$("#staff-orders-status-filter").addEventListener("change", () => {
+  currentPage = 1;
+  renderStaffOrders(allOrders);
+});
+
+$("#staff-orders-page-prev").addEventListener("click", () => {
+  currentPage = Math.max(1, currentPage - 1);
+  renderStaffOrders(allOrders);
+});
+
+$("#staff-orders-page-next").addEventListener("click", () => {
+  currentPage += 1;
+  renderStaffOrders(allOrders);
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
