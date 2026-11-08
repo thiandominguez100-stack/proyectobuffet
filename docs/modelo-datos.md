@@ -30,6 +30,15 @@ Perfil mínimo de usuario:
 
 Los alumnos solo podrán crear y modificar campos de perfil permitidos. Nunca podrán asignarse a sí mismos los roles `staff` o `admin`, ni reactivar su propia cuenta.
 
+### `profilePhotos/{uid}`
+
+Foto opcional de cada alumno, separada del perfil operativo para no incluir imágenes en las consultas del personal.
+
+- `photoData`: JPEG cuadrado en Data URL, comprimido en el navegador; máximo 150.000 caracteres.
+- `updatedAt`: marca de tiempo del servidor.
+
+El documento solo puede ser leído, creado, actualizado o eliminado por su titular.
+
 ### `orders/{orderId}`
 
 Un documento por encargo:
@@ -104,7 +113,7 @@ La cancelación válida debe actualizar el pedido y liberar la cantidad reservad
 
 ## Privacidad y acceso
 
-- Alumno: leer su perfil y sus pedidos; crear pedidos propios dentro de los límites.
+- Alumno: leer su perfil y foto; actualizar únicamente nombre para mostrar y su foto; crear pedidos propios dentro de los límites.
 - Personal: ver pedidos necesarios para producción y retiro; actualizar estados y pagos autorizados.
 - Administrador: gestionar productos, precios, calendario, cuentas y permisos.
 - Nadie puede leer ni escribir datos si no está autenticado y autorizado.
