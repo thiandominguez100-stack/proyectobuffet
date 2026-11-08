@@ -35,8 +35,30 @@ service cloud.firestore {
         && request.time.hours() < 20;
     }
 
+    function schoolDateIsOpen(dateAt) {
+      let dayNumber = dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day();
+      let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dayNumber));
+      return exists(schoolDayPath)
+        ? get(schoolDayPath).data.open == true
+        : dateAt.dayOfWeek() < 6;
+    }
+
+    function schoolDateIsClosed(dateAt) {
+      let dayNumber = dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day();
+      let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dayNumber));
+      return exists(schoolDayPath)
+        ? get(schoolDayPath).data.open == false
+        : dateAt.dayOfWeek() >= 6;
+    }
+
     function validNextSchoolDate(dateAt, dateNumber) {
-      let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dateNumber));
+      let day1 = request.time + duration.value(1, 'd');
+      let day2 = request.time + duration.value(2, 'd');
+      let day3 = request.time + duration.value(3, 'd');
+      let day4 = request.time + duration.value(4, 'd');
+      let day5 = request.time + duration.value(5, 'd');
+      let day6 = request.time + duration.value(6, 'd');
+      let day7 = request.time + duration.value(7, 'd');
       return dateAt is timestamp
         && dateNumber is int
         && dateAt.hours() == 3
@@ -44,22 +66,16 @@ service cloud.firestore {
         && dateAt.seconds() == 0
         && dateAt.nanos() == 0
         && dateNumber == dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day()
-        // Se permite pedir de lunes a viernes y los domingos; sábado queda cerrado.
         && (request.time.dayOfWeek() < 6 || request.time.dayOfWeek() == 7)
         && (
-          // Lunes a jueves: siguiente día calendario.
-          (request.time.dayOfWeek() < 5
-            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
-          ||
-          // Viernes: próxima jornada escolar, el lunes.
-          (request.time.dayOfWeek() == 5
-            && dateAt.date() == request.time.date() + duration.value(3, 'd'))
-          ||
-          // Domingo: próxima jornada escolar, el lunes.
-          (request.time.dayOfWeek() == 7
-            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
-        )
-        && (!exists(schoolDayPath) || get(schoolDayPath).data.open == true);
+          (dateAt.date() == day1.date() && schoolDateIsOpen(dateAt))
+          || (dateAt.date() == day2.date() && schoolDateIsClosed(day1) && schoolDateIsOpen(dateAt))
+          || (dateAt.date() == day3.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsOpen(dateAt))
+          || (dateAt.date() == day4.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsOpen(dateAt))
+          || (dateAt.date() == day5.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsOpen(dateAt))
+          || (dateAt.date() == day6.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsClosed(day5) && schoolDateIsOpen(dateAt))
+          || (dateAt.date() == day7.date() && schoolDateIsClosed(day1) && schoolDateIsClosed(day2) && schoolDateIsClosed(day3) && schoolDateIsClosed(day4) && schoolDateIsClosed(day5) && schoolDateIsClosed(day6) && schoolDateIsOpen(dateAt))
+        );
     }
 
     function validOrderItems(data) {
@@ -227,11 +243,15 @@ service cloud.firestore {
     match /schoolDays/{dateNumber} {
       allow get, list: if signedIn();
       allow create, update: if isAdmin()
-        && request.resource.data.keys().hasOnly(['open', 'label', 'updatedAt'])
+        && request.resource.data.keys().hasOnly(['dateNumber', 'open', 'label', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['dateNumber', 'open', 'label', 'updatedAt'])
+        && request.resource.data.dateNumber is int
+        && dateNumber == string(request.resource.data.dateNumber)
         && request.resource.data.open is bool
-        && request.resource.data.updatedAt is timestamp;
+        && request.resource.data.label is string
+        && request.resource.data.label.size() <= 80
+        && request.resource.data.updatedAt == request.time;
 
-      // La eliminación no tiene request.resource; se autoriza por separado.
       allow delete: if isAdmin();
     }
 
