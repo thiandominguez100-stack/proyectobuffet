@@ -1,5 +1,5 @@
 "use strict";
-var CACHE_NAME = "buffet411-shell-v1";
+var CACHE_NAME = "buffet411-shell-v2";
 var APP_SHELL = [
   "/",
   "./index.html",
@@ -7,6 +7,7 @@ var APP_SHELL = [
   "./css/app.css",
   "./js/app.js",
   "./js/firebase.js",
+  "./js/staff.js",
   "./manifest.webmanifest",
   "./favicon.svg"
 ];
