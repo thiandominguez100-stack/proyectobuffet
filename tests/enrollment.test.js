@@ -60,7 +60,10 @@ test("Firestore solo permite emitir códigos a administración y no permite enum
 });
 
 test("un perfil no puede crearse sin que el código quede consumido en la misma operación", () => {
-  const users = rules.slice(rules.indexOf("match /users/{uid}"), rules.indexOf("match /profilePhotos/{uid}"));
+  const usersStart = rules.indexOf("match /users/{uid}");
+  const usersEnd = rules.indexOf("match /profilePhotos/{uid}", usersStart);
+  assert.ok(usersStart >= 0 && usersEnd > usersStart, "No se encontró el bloque de reglas de perfiles");
+  const users = rules.slice(usersStart, usersEnd);
   assert.match(users, /registrationCodeId/);
   assert.match(users, /existsAfter\(\/databases\/\$\(database\)\/documents\/enrollmentCodes/);
   assert.match(users, /getAfter\(\/databases\/\$\(database\)\/documents\/enrollmentCodes/);
@@ -74,7 +77,10 @@ test("el panel muestra herramientas de inscripción solo a administración", () 
 });
 
 test("personal operativo no puede enumerar perfiles ni contadores privados", () => {
-  const users = rules.slice(rules.indexOf("match /users/{uid}"), rules.indexOf("match /profilePhotos/{uid}"));
+  const usersStart = rules.indexOf("match /users/{uid}");
+  const usersEnd = rules.indexOf("match /profilePhotos/{uid}", usersStart);
+  assert.ok(usersStart >= 0 && usersEnd > usersStart, "No se encontró el bloque de reglas de perfiles");
+  const users = rules.slice(usersStart, usersEnd);
   const totals = rules.slice(rules.indexOf("match /dailyOrderTotals/{totalId}"), rules.indexOf("Todas las colecciones no definidas"));
   assert.match(users, /allow list: if isAdmin\(\)/);
   assert.match(totals, /allow list: if signedIn\(\) && resource\.data\.uid == request\.auth\.uid/);
