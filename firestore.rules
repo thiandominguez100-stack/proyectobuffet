@@ -28,7 +28,9 @@ service cloud.firestore {
 
     function orderWindowOpen() {
       // Argentina (UTC-3): 13:00 inclusive to before 17:00 is 16:00-20:00 UTC.
-      return request.time.dayOfWeek() < 6
+      // Firebase Rules: Monday=1 ... Friday=5, Saturday=6, Sunday=7.
+      // Orders are accepted Monday-Friday and Sunday (for Monday school day).
+      return (request.time.dayOfWeek() < 6 || request.time.dayOfWeek() == 7)
         && request.time.hours() >= 16
         && request.time.hours() < 20;
     }
@@ -42,13 +44,20 @@ service cloud.firestore {
         && dateAt.seconds() == 0
         && dateAt.nanos() == 0
         && dateNumber == dateAt.year() * 10000 + dateAt.month() * 100 + dateAt.day()
-        && request.time.dayOfWeek() < 6
+        // Se permite pedir de lunes a viernes y los domingos; sábado queda cerrado.
+        && (request.time.dayOfWeek() < 6 || request.time.dayOfWeek() == 7)
         && (
+          // Lunes a jueves: siguiente día calendario.
           (request.time.dayOfWeek() < 5
             && dateAt.date() == request.time.date() + duration.value(1, 'd'))
           ||
+          // Viernes: próxima jornada escolar, el lunes.
           (request.time.dayOfWeek() == 5
             && dateAt.date() == request.time.date() + duration.value(3, 'd'))
+          ||
+          // Domingo: próxima jornada escolar, el lunes.
+          (request.time.dayOfWeek() == 7
+            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
         )
         && (!exists(schoolDayPath) || get(schoolDayPath).data.open == true);
     }
