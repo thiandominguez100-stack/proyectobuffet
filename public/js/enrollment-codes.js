@@ -5,7 +5,7 @@ const CODE_CHARACTER_COUNT = 16;
 export function normalizeEnrollmentCode(value) {
   const normalized = String(value ?? "")
     .toUpperCase()
-    .replace(/[\\s-]/g, "");
+    .replace(/[\s-]/g, "");
 
   if (
     normalized.length !== CODE_CHARACTER_COUNT ||
