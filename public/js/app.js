@@ -79,7 +79,7 @@ import {
     countTarget.textContent = String(combinedCount);
     totalTarget.textContent = formatARS(calculateCartTotal(cart));
     if (checkoutButton) {
-      var previewOnly = window.location.hostname.endsWith(".github.io");
+      var previewOnly = window.location.hostname !== "buffet411-f80af.web.app";
       checkoutButton.disabled = previewOnly || count < 1;
       if (previewOnly) checkoutButton.textContent = "Pedidos disponibles en la versión operativa";
     }
