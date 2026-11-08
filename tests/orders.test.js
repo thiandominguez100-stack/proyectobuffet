@@ -101,3 +101,14 @@ test("alumnos y personal utilizan las excepciones del calendario escolar", () =>
   assert.match(rules, /schoolDateIsClosed/);
   assert.match(rules, /schoolDateIsOpen/);
 });
+
+
+test("los pedidos validan precios del catálogo y reservan stock en la misma transacción", () => {
+  assert.match(orderClient, /doc\(db, "settings", "catalog"\)/);
+  assert.match(orderClient, /doc\(db, "dailyAvailability"/);
+  assert.match(orderClient, /transaction\.update\(availabilityRef/);
+  assert.match(orderClient, /lastAction: "reserved"/);
+  assert.match(rules, /function hasAtomicAvailability/);
+  assert.match(rules, /function validOrderItems/);
+  assert.match(rules, /match \/dailyAvailability\/\{dateNumber\}/);
+});
