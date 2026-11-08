@@ -30,10 +30,13 @@ if (location.hostname.endsWith(".github.io")) {
     doc,
     getDoc,
     serverTimestamp,
+    runTransaction,
     setDoc,
     updateDoc,
     writeBatch
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
+
+import { hashEnrollmentCode } from "./enrollment-codes.js";
 
 const $ = (selector) => document.querySelector(selector);
 const authGate = $("#student-auth-gate");
@@ -224,13 +227,19 @@ registerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (authOperationInProgress) return;
   const displayName = $("#student-register-name").value.trim();
-  const course = $("#student-register-course").value.trim();
-  const division = $("#student-register-division").value.trim();
   const email = $("#student-register-email").value.trim();
   const password = $("#student-register-password").value;
   const confirmation = $("#student-register-confirm").value;
-  if (displayName.length < 2 || displayName.length > 32 || !course || !division) {
-    showFeedback("Completá nombre, curso y división correctamente.", "error");
+  let enrollmentCodeHash;
+  try {
+    enrollmentCodeHash = await hashEnrollmentCode($("#student-register-code").value);
+  } catch (error) {
+    showFeedback("Ingresá un código de inscripción válido entregado por el personal.", "error");
+    $("#student-register-code").focus();
+    return;
+  }
+  if (displayName.length < 2 || displayName.length > 32) {
+    showFeedback("El nombre para mostrar debe tener entre 2 y 32 caracteres.", "error");
     return;
   }
   if (password.length < 8) {
@@ -250,15 +259,31 @@ registerForm.addEventListener("submit", async (event) => {
   try {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     newUser = credential.user;
-    await setDoc(doc(db, "users", newUser.uid), {
-      uid: newUser.uid,
-      displayName,
-      course,
-      division,
-      role: "student",
-      active: true,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+    const enrollmentCodeRef = doc(db, "enrollmentCodes", enrollmentCodeHash);
+    const userProfileRef = doc(db, "users", newUser.uid);
+    await runTransaction(db, async (transaction) => {
+      const codeSnapshot = await transaction.get(enrollmentCodeRef);
+      if (!codeSnapshot.exists() || codeSnapshot.data().status !== "available") {
+        throw new Error("enrollment-code-invalid");
+      }
+
+      const enrollment = codeSnapshot.data();
+      transaction.update(enrollmentCodeRef, {
+        status: "redeemed",
+        redeemedBy: newUser.uid,
+        redeemedAt: serverTimestamp()
+      });
+      transaction.set(userProfileRef, {
+        uid: newUser.uid,
+        displayName,
+        course: enrollment.course,
+        division: enrollment.division,
+        enrollmentCodeHash,
+        role: "student",
+        active: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
     });
     showVerificationPanel();
     try {
@@ -277,9 +302,11 @@ registerForm.addEventListener("submit", async (event) => {
         ? "Ingresá una dirección de correo válida."
         : error.code === "auth/weak-password"
           ? "Elegí una contraseña más segura, de al menos 8 caracteres."
-          : error.code === "permission-denied"
-            ? "Firebase no permitió guardar el perfil. Revisaremos las reglas."
-            : "No se pudo crear la cuenta. Revisá los datos e intentá nuevamente.";
+          : error.message === "enrollment-code-invalid"
+            ? "El código no existe o ya fue utilizado. Pedile uno nuevo al personal."
+            : error.code === "permission-denied"
+              ? "No se pudo validar el código de inscripción. Revisá que sea correcto o pedí ayuda al personal."
+              : "No se pudo crear la cuenta. Revisá los datos e intentá nuevamente.";
     showAuthMode("register");
     showFeedback(message, "error");
   } finally {
