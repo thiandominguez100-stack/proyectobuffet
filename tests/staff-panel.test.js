@@ -35,3 +35,12 @@ test("los totales de producción se calculan con todos los pedidos activos, no s
   assert.match(staff, /for \(const order of activeOrders\)/);
   assert.match(staff, /const filteredOrders = getFilteredStaffOrders\(sortedOrders\)/);
 });
+
+
+test("el panel calcula saldos por efectivo, Mercado Pago y pagos confirmados", () => {
+  assert.match(page, /id="staff-payment-cash-pending"/);
+  assert.match(page, /id="staff-payment-mp-pending"/);
+  assert.match(page, /id="staff-payment-paid"/);
+  assert.match(staff, /paymentBuckets/);
+  assert.match(staff, /order.paymentStatus !== payment/);
+});
