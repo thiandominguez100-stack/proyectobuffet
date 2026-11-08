@@ -71,7 +71,19 @@ test("el registro consume el código y crea el perfil en una sola transacción",
   assert.match(auth, /transaction\.get\(codeRef\)/);
   assert.match(auth, /transaction\.set\(userRef/);
   assert.match(auth, /transaction\.update\(codeRef/);
-  assert.match(auth, /registrationCodeId: registrationCode/);
+  assert.match(auth, /const codeData = codeSnapshot\.data\(\)/);
+  assert.match(auth, /course: codeData\.course/);
+  assert.match(auth, /division: codeData\.division/);
+  assert.doesNotMatch(auth, /student-register-course|student-register-division/);
+});
+
+test("el panel administrativo asocia curso y división al emitir códigos", () => {
+  assert.match(staffHtml, /id="staff-enrollment-course"/);
+  assert.match(staffHtml, /id="staff-enrollment-division"/);
+  assert.match(staff, /courseInput\.value\.trim\(\)/);
+  assert.match(staff, /divisionInput\.value\.trim\(\)/);
+  assert.match(staff, /course,/);
+  assert.match(staff, /division/);
 });
 
 test("Firestore solo permite emitir códigos a administración y no permite enumerarlos como alumno", () => {
