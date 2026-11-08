@@ -18,6 +18,7 @@ if (location.hostname !== "buffet411-f80af.web.app") {
     getDoc,
     onSnapshot,
     query,
+    runTransaction,
     serverTimestamp,
     setDoc,
     writeBatch,
@@ -44,6 +45,8 @@ let currentAuthorizedRole = null;
 let stopOrdersListener = null;
 let stopEnrollmentCodesListener = null;
 let stopSchoolDaysListener = null;
+let stopCatalogListener = null;
+let stopAvailabilityListener = null;
 let schoolDayEntries = [];
 let activeStaffServiceDateNumber = null;
 let orderActionsBusy = new Set();
@@ -61,9 +64,13 @@ function stopStaffOrders() {
   if (stopOrdersListener) stopOrdersListener();
   if (stopEnrollmentCodesListener) stopEnrollmentCodesListener();
   if (stopSchoolDaysListener) stopSchoolDaysListener();
+  if (stopCatalogListener) stopCatalogListener();
+  if (stopAvailabilityListener) stopAvailabilityListener();
   stopOrdersListener = null;
   stopEnrollmentCodesListener = null;
   stopSchoolDaysListener = null;
+  stopCatalogListener = null;
+  stopAvailabilityListener = null;
   schoolDayEntries = [];
   activeStaffServiceDateNumber = null;
   $("#staff-enrollment-tools").hidden = true;
@@ -285,10 +292,46 @@ function createActionButton(label, action, orderId, kind = "") {
     orderActionsBusy.add(key);
     button.disabled = true;
     try {
-      const patch = { updatedAt: serverTimestamp() };
-      if (action.key === "payment") patch.paymentStatus = "paid";
-      else patch.status = action.key;
-      await updateDoc(doc(db, "orders", orderId), patch);
+      const orderRef = doc(db, "orders", orderId);
+      if (action.key === "payment") {
+        await updateDoc(orderRef, {
+          paymentStatus: "paid",
+          updatedAt: serverTimestamp()
+        });
+      } else if (action.key === "cancelled") {
+        await runTransaction(db, async (transaction) => {
+          const orderSnapshot = await transaction.get(orderRef);
+          if (!orderSnapshot.exists()) throw new Error("El pedido ya no existe.");
+          const order = orderSnapshot.data();
+          if (!["pending", "accepted"].includes(order.status)) {
+            throw new Error("El estado del pedido cambió. Actualizá la lista.");
+          }
+
+          const availabilityRef = doc(db, "dailyAvailability", String(order.serviceDateNumber));
+          const stockSnapshot = await transaction.get(availabilityRef);
+          transaction.update(orderRef, {
+            status: "cancelled",
+            updatedAt: serverTimestamp()
+          });
+
+          if (stockSnapshot.exists()) {
+            const stock = stockSnapshot.data();
+            transaction.update(availabilityRef, {
+              bizcochosRemaining: Number(stock.bizcochosRemaining || 0) + Number(order.items?.bizcochos || 0),
+              facturasRemaining: Number(stock.facturasRemaining || 0) + Number(order.items?.facturas || 0),
+              updatedAt: serverTimestamp(),
+              updatedBy: auth.currentUser.uid,
+              lastOrderId: orderId,
+              lastAction: "released"
+            });
+          }
+        });
+      } else {
+        await updateDoc(orderRef, {
+          status: action.key,
+          updatedAt: serverTimestamp()
+        });
+      }
     } catch (error) {
       console.error("No se pudo actualizar el pedido:", error);
       const status = $("#staff-orders-status");
@@ -573,6 +616,135 @@ function renderSchoolCalendar() {
   }
 }
 
+function startCatalogSettingsListener() {
+  $("#staff-catalog-form").hidden = currentAuthorizedRole !== "admin";
+  stopCatalogListener = onSnapshot(doc(db, "settings", "catalog"), (snapshot) => {
+    if (!snapshot.exists()) {
+      $("#staff-catalog-state").textContent = "CATÁLOGO PENDIENTE";
+      $("#staff-catalog-feedback").textContent = "Guardá los precios iniciales para habilitar los pedidos. Valores sugeridos: Bizcochos $500 y Facturas $1.000.";
+      $("#staff-price-bizcochos").value = "500";
+      $("#staff-price-facturas").value = "1000";
+      $("#staff-active-bizcochos").checked = true;
+      $("#staff-active-facturas").checked = true;
+      return;
+    }
+
+    const products = snapshot.data().products || {};
+    $("#staff-catalog-state").textContent = "CATÁLOGO ACTIVO";
+    $("#staff-price-bizcochos").value = String(products.bizcochos?.price ?? 500);
+    $("#staff-price-facturas").value = String(products.facturas?.price ?? 1000);
+    $("#staff-active-bizcochos").checked = products.bizcochos?.active === true;
+    $("#staff-active-facturas").checked = products.facturas?.active === true;
+    $("#staff-catalog-feedback").textContent = "Los precios guardados se aplicarán a los pedidos nuevos. Los pedidos existentes conservan su total original.";
+  }, (error) => {
+    console.error("No se pudo cargar el catálogo:", error);
+    $("#staff-catalog-state").textContent = "ERROR DE CATÁLOGO";
+    $("#staff-catalog-feedback").textContent = "No se pudieron leer los precios. Revisá los permisos y la conexión.";
+  });
+}
+
+function listenForDailyAvailability(dateNumber, dateKey) {
+  if (stopAvailabilityListener) stopAvailabilityListener();
+  $("#staff-stock-date").textContent = dateLabel(dateKey);
+  $("#staff-stock-form").hidden = false;
+  stopAvailabilityListener = onSnapshot(doc(db, "dailyAvailability", String(dateNumber)), (snapshot) => {
+    if (!snapshot.exists()) {
+      $("#staff-stock-bizcochos").value = "0";
+      $("#staff-stock-facturas").value = "0";
+      $("#staff-stock-feedback").textContent = "Todavía no se cargó el stock para esta jornada. Ingresá las unidades disponibles.";
+      return;
+    }
+    const stock = snapshot.data();
+    $("#staff-stock-bizcochos").value = String(stock.bizcochosRemaining);
+    $("#staff-stock-facturas").value = String(stock.facturasRemaining);
+    $("#staff-stock-feedback").textContent = "Stock actualizado en vivo. Los pedidos lo descuentan automáticamente y las cancelaciones lo restituyen.";
+  }, (error) => {
+    console.error("No se pudo consultar el stock diario:", error);
+    $("#staff-stock-feedback").textContent = "No se pudo consultar el stock. Revisá la conexión y los permisos.";
+  });
+}
+
+$("#staff-catalog-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const feedback = $("#staff-catalog-feedback");
+  if (currentAuthorizedRole !== "admin" || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+    feedback.textContent = "Solo administración puede modificar precios y disponibilidad del catálogo.";
+    return;
+  }
+
+  const bizcochosPrice = Number($("#staff-price-bizcochos").value);
+  const facturasPrice = Number($("#staff-price-facturas").value);
+  if (!Number.isSafeInteger(bizcochosPrice) || bizcochosPrice < 1 || bizcochosPrice > 100000 ||
+      !Number.isSafeInteger(facturasPrice) || facturasPrice < 1 || facturasPrice > 100000) {
+    feedback.textContent = "Los precios deben ser números enteros entre $1 y $100.000.";
+    return;
+  }
+
+  const button = $("#staff-catalog-save");
+  button.disabled = true;
+  feedback.textContent = "Guardando catálogo…";
+  try {
+    await setDoc(doc(db, "settings", "catalog"), {
+      products: {
+        bizcochos: { price: bizcochosPrice, active: $("#staff-active-bizcochos").checked },
+        facturas: { price: facturasPrice, active: $("#staff-active-facturas").checked }
+      },
+      updatedAt: serverTimestamp(),
+      updatedBy: currentAuthorizedUid
+    });
+    feedback.textContent = "Catálogo guardado. Los alumnos ya verán los precios y productos actualizados.";
+  } catch (error) {
+    console.error("No se pudo guardar el catálogo:", error);
+    feedback.textContent = error.code === "permission-denied"
+      ? "Firebase rechazó el cambio. Confirmá que tu cuenta sea administradora."
+      : "No se pudo guardar el catálogo. Intentá nuevamente.";
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#staff-stock-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const feedback = $("#staff-stock-feedback");
+  if (!["staff", "admin"].includes(currentAuthorizedRole) ||
+      !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid ||
+      !activeStaffServiceDateNumber) {
+    feedback.textContent = "Volvé a ingresar con una cuenta autorizada para administrar stock.";
+    return;
+  }
+
+  const bizcochosRemaining = Number($("#staff-stock-bizcochos").value);
+  const facturasRemaining = Number($("#staff-stock-facturas").value);
+  if (!Number.isSafeInteger(bizcochosRemaining) || bizcochosRemaining < 0 || bizcochosRemaining > 5000 ||
+      !Number.isSafeInteger(facturasRemaining) || facturasRemaining < 0 || facturasRemaining > 5000) {
+    feedback.textContent = "El stock debe ser un número entero entre 0 y 5.000 unidades.";
+    return;
+  }
+
+  const button = $("#staff-stock-save");
+  button.disabled = true;
+  feedback.textContent = "Guardando stock…";
+  try {
+    await setDoc(doc(db, "dailyAvailability", String(activeStaffServiceDateNumber)), {
+      dateNumber: activeStaffServiceDateNumber,
+      bizcochosRemaining,
+      facturasRemaining,
+      updatedAt: serverTimestamp(),
+      updatedBy: currentAuthorizedUid,
+      lastOrderId: "",
+      lastAction: "configured"
+    });
+    feedback.textContent = "Stock guardado para la próxima jornada.";
+  } catch (error) {
+    console.error("No se pudo guardar el stock:", error);
+    feedback.textContent = error.code === "permission-denied"
+      ? "Firebase rechazó el cambio. Revisá tu rol y las reglas de stock."
+      : "No se pudo guardar el stock. Intentá nuevamente.";
+  } finally {
+    button.disabled = false;
+  }
+});
+
 function startStaffOrders() {
   stopStaffOrders();
   setOrdersConnectionState(
@@ -582,6 +754,8 @@ function startStaffOrders() {
   );
   $("#staff-orders-status").textContent = "CARGANDO…";
   $("#staff-calendar-form").hidden = currentAuthorizedRole !== "admin";
+  $("#staff-stock-form").hidden = false;
+  startCatalogSettingsListener();
 
   stopSchoolDaysListener = onSnapshot(collection(db, "schoolDays"), (calendarSnapshot) => {
     schoolDayEntries = calendarSnapshot.docs.map((item) => ({
@@ -604,6 +778,7 @@ function startStaffOrders() {
     $("#staff-next-date").textContent = dateLabel(dateKey);
     if (number === activeStaffServiceDateNumber && stopOrdersListener) return;
     activeStaffServiceDateNumber = number;
+    listenForDailyAvailability(number, dateKey);
     if (stopOrdersListener) stopOrdersListener();
 
     const ordersQuery = query(
