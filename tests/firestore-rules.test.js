@@ -142,7 +142,8 @@ test("un segundo alumno no puede reutilizar un código consumido", async () => {
     email_verified: false
   }).firestore();
   await assertFails(registrationTransaction(secondDb, "student-3", code));
-  await assertFails(getDoc(doc(secondDb, "users", "student-3")));
+  const missingProfile = await assertSucceeds(getDoc(doc(secondDb, "users", "student-3")));
+  assert.equal(missingProfile.exists(), false);
 });
 
 test("un alumno no puede crear un perfil sin código ni consumirlo por separado", async () => {
