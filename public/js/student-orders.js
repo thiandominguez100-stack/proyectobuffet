@@ -222,8 +222,10 @@ function currentCartFitsAvailability(cart = currentCart) {
   if (!catalogConfigured || !availabilityConfigured) return false;
   return ["bizcochos", "facturas"].every((productId) => {
     const quantity = Number(cart[productId] || 0);
-    return catalogProducts[productId]?.active === true &&
-      Number.isSafeInteger(quantity) && quantity <= availabilityRemaining[productId];
+    return quantity === 0 || (
+      catalogProducts[productId]?.active === true &&
+      Number.isSafeInteger(quantity) && quantity <= availabilityRemaining[productId]
+    );
   });
 }
 
