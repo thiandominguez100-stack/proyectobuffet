@@ -230,11 +230,17 @@ service cloud.firestore {
 
       allow create: if isAdmin()
         && codeId.matches('^[A-HJ-NP-Z2-9]{16}$')
-        && request.resource.data.keys().hasOnly(['status', 'createdAt', 'createdBy'])
-        && request.resource.data.keys().hasAll(['status', 'createdAt', 'createdBy'])
+        && request.resource.data.keys().hasOnly(['status', 'createdAt', 'createdBy', 'course', 'division'])
+        && request.resource.data.keys().hasAll(['status', 'createdAt', 'createdBy', 'course', 'division'])
         && request.resource.data.status == 'available'
         && request.resource.data.createdAt == request.time
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.course is string
+        && request.resource.data.course.size() >= 1
+        && request.resource.data.course.size() <= 12
+        && request.resource.data.division is string
+        && request.resource.data.division.size() >= 1
+        && request.resource.data.division.size() <= 8;
 
       // El código se consume en la misma transacción que crea el perfil.
       allow update: if (
@@ -247,6 +253,8 @@ service cloud.firestore {
           && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid))
           && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.uid == request.auth.uid
           && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.registrationCodeId == codeId
+          && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.course == resource.data.course
+          && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.division == resource.data.division
         ) || (
           isAdmin()
           && resource.data.status == 'available'
@@ -291,6 +299,8 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.status == 'used'
         && getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.usedBy == uid
         && getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.usedAt == request.time
+        && request.resource.data.course == getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.course
+        && request.resource.data.division == getAfter(/databases/$(database)/documents/enrollmentCodes/$(request.resource.data.registrationCodeId)).data.division
         && request.resource.data.role == 'student'
         && request.resource.data.active == true
         && request.resource.data.createdAt is timestamp
