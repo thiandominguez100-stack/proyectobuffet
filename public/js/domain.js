@@ -153,3 +153,17 @@ export function makeOrderSummary(cart, pickupSlot, paymentMethod) {
     paymentMethod
   };
 }
+
+
+export function getDateNumber(dateKey) {
+  if (typeof dateKey !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    throw new TypeError("La fecha del pedido no es válida.");
+  }
+  return Number(dateKey.replaceAll("-", ""));
+}
+
+export function getArgentinaMidnightTimestamp(dateKey) {
+  getDateNumber(dateKey);
+  // Medianoche de Argentina (UTC-3), representada como instante UTC.
+  return new Date(dateKey + "T00:00:00-03:00");
+}
