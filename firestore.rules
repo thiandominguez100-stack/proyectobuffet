@@ -2,15 +2,76 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Cada usuario autenticado puede consultar únicamente su propio rol.
-    // Los roles se asignan manualmente desde Firebase Console; nunca desde el cliente.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isStaff() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/staffRoles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/staffRoles/$(request.auth.uid)).data.role in ['staff', 'admin'];
+    }
+
     match /staffRoles/{uid} {
-      allow get: if request.auth != null && request.auth.uid == uid;
+      allow get: if signedIn() && request.auth.uid == uid;
       allow list, create, update, delete: if false;
     }
 
-    // Todo lo demás permanece cerrado hasta implementar y probar
-    // reglas específicas para alumnos, pedidos y administración.
+    match /users/{uid} {
+      allow get: if (signedIn() && request.auth.uid == uid) || isStaff();
+      allow list: if isStaff();
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'course', 'division',
+          'role', 'active', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'uid', 'email', 'displayName', 'course', 'division',
+          'role', 'active', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 32
+        && request.resource.data.course is string
+        && request.resource.data.course.size() >= 1
+        && request.resource.data.course.size() <= 12
+        && request.resource.data.division is string
+        && request.resource.data.division.size() >= 1
+        && request.resource.data.division.size() <= 8
+        && request.resource.data.role == 'student'
+        && request.resource.data.active == true
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 32
+        && request.resource.data.updatedAt is timestamp;
+
+      allow delete: if false;
+    }
+
+    match /profilePhotos/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['photoData', 'updatedAt'])
+        && request.resource.data.keys().hasAll(['photoData', 'updatedAt'])
+        && request.resource.data.photoData is string
+        && request.resource.data.photoData.size() <= 150000
+        && request.resource.data.photoData.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
