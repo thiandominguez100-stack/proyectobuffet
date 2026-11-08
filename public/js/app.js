@@ -14,7 +14,7 @@ import {
   "use strict";
 
   // student-auth.js administra el acceso y los perfiles con Firebase.
-  // Este módulo conserva el carrito local de demostración; los pedidos reales aún no están habilitados.
+  // Este módulo mantiene el carrito local; student-orders.js lo guarda de forma transaccional en Firestore.
   if (auth && db) {
     document.documentElement.setAttribute("data-firebase", "initialized");
   }
@@ -54,6 +54,8 @@ import {
   var countTarget = document.querySelector("[data-cart-count]");
   var totalTarget = document.querySelector("[data-cart-total]");
   var feedback = document.querySelector("[data-cart-feedback]");
+  var checkoutButton = document.querySelector("#checkout-open");
+  var bookedQuantity = 0;
 
   function showFeedback(message, kind) {
     if (!feedback) return;
@@ -66,8 +68,10 @@ import {
     if (!cartList || !countTarget || !totalTarget) return;
 
     var count = countCartUnits(cart);
-    countTarget.textContent = String(count);
+    var combinedCount = bookedQuantity + count;
+    countTarget.textContent = String(combinedCount);
     totalTarget.textContent = formatARS(calculateCartTotal(cart));
+    if (checkoutButton) checkoutButton.disabled = count < 1;
     cartList.replaceChildren();
 
     if (count === 0) {
@@ -111,7 +115,7 @@ import {
         increase.setAttribute("aria-label", "Agregar una unidad de " + product.name);
         increase.dataset.cartAction = "increase";
         increase.dataset.productId = product.id;
-        increase.disabled = count >= 5;
+        increase.disabled = combinedCount >= 5;
 
         controls.append(decrease, quantityLabel, increase);
 
@@ -125,18 +129,37 @@ import {
     }
 
     document.querySelectorAll("[data-add-product]").forEach(function (button) {
-      button.disabled = count >= 5;
-      button.classList.toggle("button-disabled", count >= 5);
-      button.textContent = count >= 5 ? "Límite diario alcanzado" :
+      button.disabled = combinedCount >= 5;
+      button.classList.toggle("button-disabled", combinedCount >= 5);
+      button.textContent = combinedCount >= 5 ? "Límite diario alcanzado" :
         (button.dataset.addProduct === "bizcochos" ? "Agregar bizcochos" : "Agregar facturas");
     });
+
+    document.dispatchEvent(new CustomEvent("b411:cart-updated", {
+      detail: { cart: { ...cart }, count: count, total: calculateCartTotal(cart) }
+    }));
   }
+
+  document.addEventListener("b411:daily-total", function (event) {
+    bookedQuantity = Math.max(0, Math.min(5, Number(event.detail.quantity || 0)));
+    renderCart();
+  });
+
+  document.addEventListener("b411:clear-cart", function () {
+    cart = createEmptyCart();
+    renderCart();
+    showFeedback("¡Pedido guardado! Podés consultar su estado en «Mis pedidos».", "success");
+  });
 
   document.querySelectorAll("[data-add-product]").forEach(function (button) {
     button.addEventListener("click", function () {
       try {
-        cart = addProductToCart(cart, button.dataset.addProduct, 1);
-        showFeedback("Producto agregado. Llevás " + countCartUnits(cart) + " de 5 unidades.", "success");
+        var candidate = addProductToCart(cart, button.dataset.addProduct, 1);
+        if (bookedQuantity + countCartUnits(candidate) > 5) {
+          throw new RangeError("Ya usaste parte del límite diario. Te quedan " + Math.max(0, 5 - bookedQuantity) + " unidad(es).");
+        }
+        cart = candidate;
+        showFeedback("Producto agregado. Llevás " + (bookedQuantity + countCartUnits(cart)) + " de 5 unidades.", "success");
         renderCart();
       } catch (error) {
         showFeedback(error.message || "No se pudo agregar el producto.", "error");
@@ -151,7 +174,11 @@ import {
       var productId = button.dataset.productId;
       try {
         if (button.dataset.cartAction === "increase") {
-          cart = addProductToCart(cart, productId, 1);
+          var candidate = addProductToCart(cart, productId, 1);
+          if (bookedQuantity + countCartUnits(candidate) > 5) {
+            throw new RangeError("Ya usaste parte del límite diario. Te quedan " + Math.max(0, 5 - bookedQuantity) + " unidad(es).");
+          }
+          cart = candidate;
         } else {
           cart = removeProductFromCart(cart, productId, 1);
         }
