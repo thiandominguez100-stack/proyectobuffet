@@ -98,7 +98,7 @@ test.beforeEach(async () => {
   });
 });
 
-function registrationTransaction(db, uid, enrollmentCode) {
+function registrationTransaction(db, uid, enrollmentCode, profileOverrides = {}) {
   return runTransaction(db, async (transaction) => {
     const codeRef = doc(db, "enrollmentCodes", enrollmentCode);
     const codeSnapshot = await transaction.get(codeRef);
@@ -116,7 +116,8 @@ function registrationTransaction(db, uid, enrollmentCode) {
       role: "student",
       active: true,
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      ...profileOverrides
     });
     transaction.update(codeRef, {
       status: "used",
@@ -155,6 +156,32 @@ test("un alumno puede consumir un código una sola vez al crear su perfil", asyn
   });
   assert.equal(usedCodeData.status, "used");
   assert.equal(usedCodeData.usedBy, "student-2");
+});
+
+test("un código no se puede crear sin curso y división válidos", async () => {
+  const db = testEnv.authenticatedContext("admin-1").firestore();
+  await assertFails(setDoc(doc(db, "enrollmentCodes", "BCDEFGHJKLMNPQRT"), {
+    status: "available",
+    createdAt: serverTimestamp(),
+    createdBy: "admin-1"
+  }));
+  await assertFails(setDoc(doc(db, "enrollmentCodes", "BCDEFGHJKLMNPQRS"), {
+    status: "available",
+    createdAt: serverTimestamp(),
+    createdBy: "admin-1",
+    course: "",
+    division: "A"
+  }));
+});
+
+test("el perfil no puede modificar el curso ni la división asignados al código", async () => {
+  const db = testEnv.authenticatedContext("student-2", {
+    email_verified: false
+  }).firestore();
+  await assertFails(registrationTransaction(db, "student-2", code, {
+    course: "6°",
+    division: "C"
+  }));
 });
 
 test("un segundo alumno no puede reutilizar un código consumido", async () => {
