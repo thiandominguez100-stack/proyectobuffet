@@ -450,6 +450,45 @@ if (enrollmentForm) {
   });
 }
 
+const enrollmentRevokeButton = $("#staff-enrollment-revoke");
+if (enrollmentRevokeButton) {
+  enrollmentRevokeButton.addEventListener("click", async () => {
+    if (currentAuthorizedRole !== "admin" || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+      enrollmentMessage.textContent = "Solo una cuenta administradora puede anular códigos.";
+      return;
+    }
+
+    const codeInput = $("#staff-enrollment-revoke-code");
+    const rawCode = codeInput.value.trim();
+    let codeHash;
+    try {
+      codeHash = await hashEnrollmentCode(rawCode);
+    } catch (error) {
+      enrollmentMessage.textContent = "Ingresá un código completo y válido para anularlo.";
+      codeInput.focus();
+      return;
+    }
+
+    enrollmentRevokeButton.disabled = true;
+    try {
+      await updateDoc(doc(db, "enrollmentCodes", codeHash), {
+        status: "revoked",
+        revokedBy: currentAuthorizedUid,
+        revokedAt: serverTimestamp()
+      });
+      codeInput.value = "";
+      enrollmentMessage.textContent = "Código anulado. Ya no se puede utilizar para crear una cuenta.";
+    } catch (error) {
+      console.error("No se pudo anular el código:", error);
+      enrollmentMessage.textContent = error.code === "permission-denied"
+        ? "No se pudo anular: el código ya fue usado, no existe o las reglas aún no están publicadas."
+        : "No se pudo anular el código. Revisá la conexión e intentá nuevamente.";
+    } finally {
+      enrollmentRevokeButton.disabled = false;
+    }
+  });
+}
+
 const enrollmentCopyButton = $("#staff-enrollment-copy");
 if (enrollmentCopyButton) {
   enrollmentCopyButton.addEventListener("click", async () => {
