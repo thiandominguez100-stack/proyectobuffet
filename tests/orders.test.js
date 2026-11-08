@@ -65,9 +65,9 @@ test("el alumno puede confirmar el recreo y el método de pago", () => {
 });
 
 
-test("GitHub Pages no acepta pedidos ni consulta Firestore", async () => {
+test("los dominios que no son de producción no aceptan pedidos ni consultan Firestore", async () => {
   const preview = orderClient.slice(0, orderClient.indexOf("} else {"));
-  assert.match(preview, /location\.hostname\.endsWith\("\.github\.io"\)/);
+  assert.match(preview, /location\.hostname !== "buffet411-f80af\.web\.app"/);
   assert.match(preview, /checkout\.disabled = true/);
   assert.doesNotMatch(preview, /runTransaction|onSnapshot|firebase\.js/);
 });
@@ -75,7 +75,7 @@ test("GitHub Pages no acepta pedidos ni consulta Firestore", async () => {
 
 test("el carrito local nunca habilita checkout desde GitHub Pages", async () => {
   const app = await readFile(new URL("../public/js/app.js", import.meta.url), "utf8");
-  assert.match(app, /previewOnly = window\.location\.hostname\.endsWith\("\.github\.io"\)/);
+  assert.match(app, /previewOnly = window\.location\.hostname !== "buffet411-f80af\.web\.app"/);
   assert.match(app, /checkoutButton\.disabled = previewOnly \|\| count < 1/);
 });
 
