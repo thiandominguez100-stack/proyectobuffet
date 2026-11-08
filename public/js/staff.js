@@ -372,11 +372,13 @@ function getFilteredStaffOrders(orders) {
   const search = normalizeOrderSearch($("#staff-orders-search").value);
   const slot = $("#staff-orders-slot-filter").value;
   const status = $("#staff-orders-status-filter").value;
+  const payment = $("#staff-orders-payment-filter")?.value || "all";
 
   return orders.filter((order) => {
     if (status === "active" && order.status === "cancelled") return false;
     if (status !== "active" && status !== "all" && order.status !== status) return false;
     if (slot !== "all" && order.pickupSlot !== slot) return false;
+    if (payment !== "all" && order.paymentStatus !== payment) return false;
     if (!search) return true;
 
     const searchableText = normalizeOrderSearch([
@@ -430,6 +432,25 @@ function renderStaffOrders(orders) {
   $("#staff-orders-status").textContent = activeOrders.length
     ? activeOrders.length + " PEDIDO(S) ACTIVOS"
     : "SIN PEDIDOS ACTIVOS";
+
+  const paymentBuckets = {
+    unpaid: { count: 0, total: 0 },
+    pending_review: { count: 0, total: 0 },
+    paid: { count: 0, total: 0 }
+  };
+  for (const order of activeOrders) {
+    const bucket = paymentBuckets[order.paymentStatus];
+    if (bucket) {
+      bucket.count += 1;
+      bucket.total += Number(order.total || 0);
+    }
+  }
+  $("#staff-payment-cash-pending").textContent = formatARS(paymentBuckets.unpaid.total);
+  $("#staff-payment-cash-count").textContent = paymentBuckets.unpaid.count + " pedido(s)";
+  $("#staff-payment-mp-pending").textContent = formatARS(paymentBuckets.pending_review.total);
+  $("#staff-payment-mp-count").textContent = paymentBuckets.pending_review.count + " pedido(s)";
+  $("#staff-payment-paid").textContent = formatARS(paymentBuckets.paid.total);
+  $("#staff-payment-paid-count").textContent = paymentBuckets.paid.count + " pedido(s)";
 
   const sortedOrders = [...orders].sort((a, b) => {
     const courseA = (a.course || "") + (a.division || "") + (a.displayName || "");
@@ -535,6 +556,20 @@ $("#staff-orders-slot-filter").addEventListener("change", () => {
 $("#staff-orders-status-filter").addEventListener("change", () => {
   currentPage = 1;
   renderStaffOrders(allOrders);
+});
+
+$("#staff-orders-payment-filter").addEventListener("change", () => {
+  currentPage = 1;
+  renderStaffOrders(allOrders);
+});
+
+document.querySelectorAll("[data-payment-filter]").forEach((button) => {
+  button.addEventListener("click", () => {
+    $("#staff-orders-payment-filter").value = button.dataset.paymentFilter;
+    currentPage = 1;
+    renderStaffOrders(allOrders);
+    $("#pedidos").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 });
 
 $("#staff-orders-page-prev").addEventListener("click", () => {
