@@ -234,3 +234,8 @@
 .staff-stock-form label{min-width:0}
 @media(max-width:760px){.staff-catalog-product{grid-template-columns:1fr 1fr}.staff-catalog-product>strong{grid-column:1/-1}.staff-stock-form{grid-template-columns:1fr 1fr}.staff-stock-form button{grid-column:1/-1}}
 @media(max-width:440px){.staff-catalog-product,.staff-stock-form{grid-template-columns:1fr}.staff-catalog-product>strong{grid-column:auto}}
+
+
+.staff-enrollment-code-details{display:grid;gap:3px;min-width:0}
+.staff-enrollment-code-details code{font-size:11px;letter-spacing:.5px}
+.staff-enrollment-code-details small{font-size:9px;color:var(--muted)}
