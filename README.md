@@ -32,6 +32,17 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 - Límite diario: 5 unidades totales por alumno y jornada, combinando Bizcochos y Facturas.
 - Los roles previstos son alumno, personal y administrador.
 
+## Códigos únicos de inscripción (rama de preparación)
+
+- Las nuevas cuentas de alumno requieren un código aleatorio de un solo uso, emitido desde el panel por una cuenta con rol `admin`.
+- El código tiene 80 bits aleatorios, se normaliza y se consulta mediante su hash SHA-256. El código original no se almacena en Firestore; se muestra una sola vez al administrador que lo genera.
+- El curso y la división se toman del documento del código, no del formulario del alumno.
+- El canje del código y la creación del perfil se hacen en una transacción. Las reglas exigen que ambos cambios ocurran juntos; un código usado no puede volver a canjearse.
+- El proyecto no usa Cloud Functions ni requiere activar Blaze para esta función.
+- **Límite importante:** el código es un comprobante de un solo uso, no una verificación de identidad del alumno. Debe entregarse individualmente y con cuidado. Si se necesita demostrar que pertenece a una persona concreta, la escuela debe aprobar un mecanismo adicional de cotejo con su padrón.
+- Las cuentas creadas antes de activar esta función no tienen código asociado y continúan siendo perfiles existentes. Antes de abrir el registro a toda la escuela habrá que decidir cómo migrar o retirar las cuentas de prueba; no deben borrarse cuentas ni pedidos automáticamente.
+- Esta implementación está en una rama de preparación y no debe publicarse hasta ejecutar las pruebas del emulador de Firestore y validar el flujo con una cuenta nueva de prueba.
+
 ## Estructura
 
 - `public/`: archivos servidos por Firebase Hosting.
