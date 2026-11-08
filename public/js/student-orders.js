@@ -42,6 +42,7 @@ const ordersList = $("#student-orders-list");
 let studentProfile = null;
 let currentCart = { bizcochos: 0, facturas: 0 };
 let currentCartTotal = 0;
+let checkoutQuotedTotal = 0;
 let dailyQuantity = 0;
 let serviceDateKey = "";
 let serviceDateNumber = 0;
@@ -415,7 +416,8 @@ checkoutButton.addEventListener("click", () => {
     return;
   }
   prepareServiceDate();
-  $("#checkout-total").textContent = formatARS(currentCartTotal);
+  checkoutQuotedTotal = currentCartTotal;
+  $("#checkout-total").textContent = formatARS(checkoutQuotedTotal);
   setCheckoutFeedback("Revisá el recreo y el medio de pago antes de enviar.");
   checkoutDialog.showModal();
 });
@@ -502,6 +504,11 @@ checkoutForm.addEventListener("submit", async (event) => {
       if (!Number.isSafeInteger(confirmedTotal) || confirmedTotal < 1) {
         throw new Error("catalog-invalid");
       }
+      if (confirmedTotal !== checkoutQuotedTotal) {
+        checkoutQuotedTotal = confirmedTotal;
+        $("#checkout-total").textContent = formatARS(confirmedTotal);
+        throw new Error("price-changed");
+      }
 
       const orderData = {
         uid: user.uid,
@@ -550,8 +557,10 @@ checkoutForm.addEventListener("submit", async (event) => {
     }, 120);
   } catch (error) {
     console.error("No se pudo guardar el pedido:", error);
-    const message = error.message === "catalog-not-configured"
-      ? "El catálogo todavía no fue configurado por administración."
+    const message = error.message === "price-changed"
+      ? "El precio cambió mientras confirmabas. Revisá el nuevo total que aparece arriba y volvé a enviar el pedido si estás de acuerdo."
+      : error.message === "catalog-not-configured"
+        ? "El catálogo todavía no fue configurado por administración."
       : error.message === "stock-not-configured"
         ? "El personal todavía no cargó el stock para esta jornada."
         : error.message === "stock-insufficient"
