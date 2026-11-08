@@ -1,5 +1,9 @@
 # Arquitectura inicial — Buffet 411
 
+## Entornos
+
+GitHub Pages se reserva para una vista de muestra sin autenticación ni intercambio de datos. Firebase Hosting es el destino operativo; sus módulos de Firebase se cargan solo cuando el host no termina en `.github.io`.
+
 ## Dos áreas de la aplicación
 
 ### Alumnos — `public/index.html`
