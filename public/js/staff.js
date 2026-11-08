@@ -18,12 +18,12 @@ if (location.hostname !== "buffet411-f80af.web.app") {
     onSnapshot,
     query,
     serverTimestamp,
-    setDoc,
+    writeBatch,
     updateDoc,
     where
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
   const { formatARS, getNextSchoolDate, getDateNumber } = await import("./domain.js");
-  const { generateEnrollmentCode } = await import("./enrollment.js");
+  const { generateEnrollmentCodes } = await import("./enrollment.js");
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#staff-login-form");
@@ -148,6 +148,22 @@ function renderEnrollmentCodes(snapshot) {
   }
 }
 
+function downloadEnrollmentCodesCsv(codes) {
+  if (!Array.isArray(codes) || !codes.length) {
+    throw new Error("No hay códigos guardados para descargar.");
+  }
+  const csv = "\uFEFFCódigo de inscripción\\r\\n" + codes.join("\\r\\n") + "\\r\\n";
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "buffet411-codigos-inscripcion.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function startEnrollmentCodeManager(user) {
   const section = $("#staff-enrollment-tools");
   if (currentAuthorizedRole !== "admin") {
@@ -169,28 +185,72 @@ function startEnrollmentCodeManager(user) {
   });
 
   const createButton = $("#staff-enrollment-create");
+  const quantityInput = $("#staff-enrollment-quantity");
   createButton.onclick = async () => {
     if (!auth.currentUser || auth.currentUser.uid !== user.uid || currentAuthorizedRole !== "admin") {
       $("#staff-enrollment-feedback").textContent = "La sesión administrativa ya no está vigente. Volvé a ingresar.";
       return;
     }
+
+    const requestedCount = Number(quantityInput.value);
+    if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 300) {
+      $("#staff-enrollment-feedback").textContent = "Ingresá una cantidad entera entre 1 y 300.";
+      quantityInput.focus();
+      return;
+    }
+
     createButton.disabled = true;
+    quantityInput.disabled = true;
+    const savedCodes = [];
+    let saveError = null;
     try {
-      const code = generateEnrollmentCode();
-      await setDoc(doc(db, "enrollmentCodes", code), {
-        status: "available",
-        createdAt: serverTimestamp(),
-        createdBy: user.uid
-      });
-      $("#staff-enrollment-feedback").textContent = "Código creado. Copialo y entregalo a un solo alumno.";
+      const codes = generateEnrollmentCodes(requestedCount);
+      const chunkSize = 5;
+      for (let offset = 0; offset < codes.length; offset += chunkSize) {
+        const chunk = codes.slice(offset, offset + chunkSize);
+        const batch = writeBatch(db);
+        for (const code of chunk) {
+          batch.set(doc(db, "enrollmentCodes", code), {
+            status: "available",
+            createdAt: serverTimestamp(),
+            createdBy: user.uid
+          });
+        }
+        await batch.commit();
+        savedCodes.push(...chunk);
+        $("#staff-enrollment-feedback").textContent =
+          "Guardados " + savedCodes.length + " de " + requestedCount + " códigos…";
+      }
     } catch (error) {
-      console.error("No se pudo crear el código:", error);
-      $("#staff-enrollment-feedback").textContent = error.code === "permission-denied"
-        ? "Firebase rechazó la creación. Verificá que las reglas nuevas estén publicadas y que tu cuenta sea administradora."
-        : error.message || "No se pudo crear el código. Intentá nuevamente.";
+      saveError = error;
+      console.error("No se pudo completar el lote de códigos:", error);
     } finally {
       createButton.disabled = false;
+      quantityInput.disabled = false;
     }
+
+    if (savedCodes.length) {
+      try {
+        downloadEnrollmentCodesCsv(savedCodes);
+      } catch (downloadError) {
+        console.error("No se pudo descargar el CSV:", downloadError);
+        $("#staff-enrollment-feedback").textContent =
+          "Se guardaron " + savedCodes.length + " códigos, pero no se pudo descargar el CSV. Podés copiarlos desde la lista.";
+        return;
+      }
+    }
+
+    if (saveError) {
+      $("#staff-enrollment-feedback").textContent = savedCodes.length
+        ? "Se guardaron y descargaron " + savedCodes.length + " de " + requestedCount + " códigos. El resto no se creó; revisá permisos y volvé a intentarlo con otra cantidad."
+        : saveError.code === "permission-denied"
+          ? "Firebase rechazó la creación. Verificá que tu cuenta sea administradora y que las reglas estén actualizadas."
+          : saveError.message || "No se pudo crear el lote. Intentá nuevamente.";
+      return;
+    }
+
+    $("#staff-enrollment-feedback").textContent =
+      "Listo: se guardaron " + savedCodes.length + " códigos y se descargó el CSV. Entregá uno a cada alumno y no compartas la lista públicamente.";
   };
 }
 
