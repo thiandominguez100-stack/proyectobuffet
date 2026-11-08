@@ -37,6 +37,10 @@ service cloud.firestore {
 
     function validNextSchoolDate(dateAt, dateNumber) {
       let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dateNumber));
+      let nextDay = dateAt > request.time
+        && dateAt < request.time + duration.value(1, 'd');
+      let nextMonday = dateAt > request.time + duration.value(2, 'd')
+        && dateAt < request.time + duration.value(3, 'd');
       return dateAt is timestamp
         && dateNumber is int
         && dateAt.hours() == 3
@@ -47,17 +51,15 @@ service cloud.firestore {
         // Se permite pedir de lunes a viernes y los domingos; sábado queda cerrado.
         && (request.time.dayOfWeek() < 6 || request.time.dayOfWeek() == 7)
         && (
-          // Lunes a jueves: siguiente día calendario.
-          (request.time.dayOfWeek() < 5
-            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
+          // Lunes a jueves y domingo: próxima medianoche argentina.
+          ((request.time.dayOfWeek() < 5 || request.time.dayOfWeek() == 7)
+            && nextDay
+            && dateAt.dayOfWeek() == (request.time.dayOfWeek() == 7 ? 1 : request.time.dayOfWeek() + 1))
           ||
-          // Viernes: próxima jornada escolar, el lunes.
+          // Viernes: el lunes siguiente, incluso al cambiar de mes o año.
           (request.time.dayOfWeek() == 5
-            && dateAt.date() == request.time.date() + duration.value(3, 'd'))
-          ||
-          // Domingo: próxima jornada escolar, el lunes.
-          (request.time.dayOfWeek() == 7
-            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
+            && nextMonday
+            && dateAt.dayOfWeek() == 1)
         )
         && (!exists(schoolDayPath) || get(schoolDayPath).data.open == true);
     }
