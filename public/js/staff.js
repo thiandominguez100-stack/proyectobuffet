@@ -767,7 +767,7 @@ function startStaffOrders() {
 
     let dateKey;
     try {
-      dateKey = getNextSchoolDate(new Date(), getCalendarOptions());
+      dateKey = getNextSchoolDate(new Date(), { ...getCalendarOptions(), maxDays: 7 });
     } catch (error) {
       setOrdersConnectionState("ERROR DE CALENDARIO", "No encontramos una jornada", "Revisá las excepciones del calendario escolar.");
       $("#staff-orders-status").textContent = "ERROR DE CALENDARIO";
