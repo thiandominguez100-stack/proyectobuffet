@@ -78,3 +78,13 @@ test("el carrito local nunca habilita checkout desde GitHub Pages", async () => 
   assert.match(app, /previewOnly = window\.location\.hostname\.endsWith\("\.github\.io"\)/);
   assert.match(app, /checkoutButton\.disabled = previewOnly \|\| count < 1/);
 });
+
+
+test("el domingo puede crear pedidos para el lunes y el sábado queda excluido", () => {
+  assert.equal(getNextSchoolDate(new Date("2026-11-08T16:00:00.000Z")), "2026-11-09");
+  assert.equal(isOrderWindowOpen(new Date("2026-11-08T16:00:00.000Z")), true);
+  assert.equal(isOrderWindowOpen(new Date("2026-11-07T16:00:00.000Z")), false);
+  assert.match(rules, /request\.time\.dayOfWeek\(\) == 7/);
+  assert.match(rules, /request\.time\.dayOfWeek\(\) < 6 \|\| request\.time\.dayOfWeek\(\) == 7/);
+  assert.match(rules, /dateAt\.date\(\) == request\.time\.date\(\) \+ duration\.value\(1, 'd'\)/);
+});
