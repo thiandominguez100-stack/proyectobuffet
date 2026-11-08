@@ -92,6 +92,10 @@ test("Firestore solo permite emitir códigos a administración y no permite enum
   assert.match(section, /allow list: if isAdmin\(\)/);
   assert.match(section, /resource\.data\.status == 'available'/);
   assert.match(section, /request\.resource\.data\.status == 'used'/);
+  assert.match(section, /request\.resource\.data\.course is string/);
+  assert.match(section, /request\.resource\.data\.division is string/);
+  assert.match(section, /\.data\.course == resource\.data\.course/);
+  assert.match(section, /\.data\.division == resource\.data\.division/);
   assert.match(section, /getAfter\(\/databases\/\$\(database\)\/documents\/users\/\$\(request\.auth\.uid\)\)/);
 });
 
