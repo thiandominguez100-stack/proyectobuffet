@@ -47,6 +47,8 @@ let serviceDateKey = "";
 let serviceDateNumber = 0;
 let stopDailyTotal = null;
 let stopOrders = null;
+let stopSchoolDays = null;
+let schoolDayEntries = [];
 let authLoadToken = 0;
 let placingOrder = false;
 
@@ -81,8 +83,16 @@ function updateDailyCounter() {
   }));
 }
 
-function prepareServiceDate() {
-  serviceDateKey = getNextSchoolDate(new Date());
+function calendarDateKey(value) {
+  const digits = String(value || "").replace(/\\D/g, "").padStart(8, "0");
+  if (digits.length !== 8) return "";
+  return digits.slice(0, 4) + "-" + digits.slice(4, 6) + "-" + digits.slice(6, 8);
+}
+
+function prepareServiceDate(entries = schoolDayEntries) {
+  const openDates = entries.filter((entry) => entry.open).map((entry) => calendarDateKey(entry.dateNumber));
+  const closedDates = entries.filter((entry) => !entry.open).map((entry) => calendarDateKey(entry.dateNumber));
+  serviceDateKey = getNextSchoolDate(new Date(), { openDates, closedDates });
   serviceDateNumber = getDateNumber(serviceDateKey);
   const at = getArgentinaMidnightTimestamp(serviceDateKey);
   $("#checkout-service-date").textContent = new Intl.DateTimeFormat("es-AR", {
@@ -97,8 +107,13 @@ function prepareServiceDate() {
 function stopStudentListeners() {
   if (stopDailyTotal) stopDailyTotal();
   if (stopOrders) stopOrders();
+  if (stopSchoolDays) stopSchoolDays();
   stopDailyTotal = null;
   stopOrders = null;
+  stopSchoolDays = null;
+  schoolDayEntries = [];
+  serviceDateKey = "";
+  serviceDateNumber = 0;
   dailyQuantity = 0;
   updateDailyCounter();
 }
@@ -164,17 +179,7 @@ function renderOrders(documents) {
   }
 }
 
-async function connectStudent(user, token) {
-  if (!user.emailVerified) return;
-  const profileSnapshot = await getDoc(doc(db, "users", user.uid));
-  if (token !== authLoadToken || !auth.currentUser) return;
-  if (!profileSnapshot.exists()) return;
-  const profile = profileSnapshot.data();
-  if (profile.role !== "student" || profile.active !== true) return;
-
-  studentProfile = profile;
-  prepareServiceDate();
-
+function listenForDailyTotal(user, token) {
   const totalRef = doc(db, "dailyOrderTotals", user.uid + "_" + serviceDateNumber);
   stopDailyTotal = onSnapshot(totalRef, (snapshot) => {
     if (token !== authLoadToken) return;
@@ -184,17 +189,58 @@ async function connectStudent(user, token) {
     console.error("No se pudo leer el límite diario:", error);
     setCheckoutFeedback("No pudimos consultar tu límite diario. El servidor lo comprobará al confirmar.", "error");
   });
+}
 
-  const ownOrders = query(
-    collection(db, "orders"),
-    where("uid", "==", user.uid)
+async function connectStudent(user, token) {
+  if (!user.emailVerified) return;
+  const profileSnapshot = await getDoc(doc(db, "users", user.uid));
+  if (token !== authLoadToken || !auth.currentUser) return;
+  if (!profileSnapshot.exists()) return;
+  const profile = profileSnapshot.data();
+  if (profile.role !== "student" || profile.active !== true) return;
+
+  studentProfile = profile;
+  stopOrders = onSnapshot(
+    query(collection(db, "orders"), where("uid", "==", user.uid)),
+    (snapshot) => {
+      if (token !== authLoadToken) return;
+      renderOrders(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+    },
+    (error) => {
+      console.error("No se pudieron cargar tus pedidos:", error);
+      ordersList.textContent = "No pudimos cargar tus pedidos. Actualizá la página para intentar nuevamente.";
+    }
   );
-  stopOrders = onSnapshot(ownOrders, (snapshot) => {
+
+  stopSchoolDays = onSnapshot(collection(db, "schoolDays"), (snapshot) => {
     if (token !== authLoadToken) return;
-    renderOrders(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
+    const previousServiceDate = serviceDateNumber;
+    schoolDayEntries = snapshot.docs.map((item) => ({
+      id: item.id,
+      ...item.data(),
+      dateNumber: Number(item.data().dateNumber || item.id)
+    }));
+    try {
+      prepareServiceDate(schoolDayEntries);
+      if (previousServiceDate !== serviceDateNumber || !stopDailyTotal) {
+        if (stopDailyTotal) stopDailyTotal();
+        listenForDailyTotal(user, token);
+      }
+    } catch (error) {
+      console.error("No se pudo calcular la próxima jornada:", error);
+      setCheckoutFeedback("No pudimos calcular la próxima jornada. Consultá al personal del buffet.", "error");
+    }
   }, (error) => {
-    console.error("No se pudieron cargar tus pedidos:", error);
-    ordersList.textContent = "No pudimos cargar tus pedidos. Actualizá la página para intentar nuevamente.";
+    console.error("No se pudo consultar el calendario escolar:", error);
+    if (!serviceDateNumber) {
+      try {
+        prepareServiceDate([]);
+        listenForDailyTotal(user, token);
+      } catch (dateError) {
+        console.error("No se pudo calcular la fecha sin calendario:", dateError);
+      }
+    }
+    setCheckoutFeedback("No pudimos actualizar el calendario escolar. Se mantiene la fecha ya cargada.", "error");
   });
 }
 
