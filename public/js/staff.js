@@ -1,3 +1,10 @@
+if (location.hostname.endsWith(".github.io")) {
+  // GitHub Pages shows the layout only; staff credentials and Firestore remain untouched.
+  const authPanel = document.querySelector("#staff-auth");
+  const dashboard = document.querySelector("#staff-dashboard");
+  if (authPanel) authPanel.hidden = true;
+  if (dashboard) dashboard.hidden = false;
+} else {
 import { auth, db } from "./firebase.js";
 import {
   onAuthStateChanged,
@@ -332,3 +339,5 @@ onAuthStateChanged(auth, async (user) => {
     showLogin("No se pudieron verificar los permisos. El panel quedó bloqueado.", "error");
   }
 });
+
+}
