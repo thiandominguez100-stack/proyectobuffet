@@ -276,7 +276,7 @@ test("un pedido reserva stock y actualiza el límite diario en una sola transacc
 
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const adminDb = context.firestore();
-    await setDoc(catalogRef, {
+    await setDoc(doc(adminDb, "settings", "catalog"), {
       products: {
         bizcochos: { price: 700, active: true },
         facturas: { price: 1200, active: true }
@@ -284,7 +284,7 @@ test("un pedido reserva stock y actualiza el límite diario en una sola transacc
       updatedAt: new Date(),
       updatedBy: "admin-1"
     });
-    await setDoc(stockRef, {
+    await setDoc(doc(adminDb, "dailyAvailability", String(serviceDateNumber)), {
       dateNumber: serviceDateNumber,
       bizcochosRemaining: 10,
       facturasRemaining: 10,
