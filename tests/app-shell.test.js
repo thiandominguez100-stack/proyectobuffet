@@ -31,3 +31,12 @@ test("el tema se aplica al cargar, se puede alternar y se guarda", () => {
 test("la caché de la aplicación cambia de versión al publicar una corrección", () => {
   assert.match(serviceWorker, /buffet411-shell-v8/);
 });
+
+test("el panel solo anuncia pedidos en vivo tras confirmar la conexión remota", async () => {
+  const staff = await readFile(new URL("../public/js/staff.js", import.meta.url), "utf8");
+  assert.match(staff, /CONECTANDO…/);
+  assert.match(staff, /snapshot\.metadata\.fromCache/);
+  assert.match(staff, /PEDIDOS EN VIVO/);
+  assert.match(staff, /SIN PERMISO/);
+  assert.match(staff, /No se pudo conectar/);
+});
