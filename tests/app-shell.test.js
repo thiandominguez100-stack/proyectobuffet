@@ -29,7 +29,7 @@ test("el tema se aplica al cargar, se puede alternar y se guarda", () => {
 });
 
 test("la caché de la aplicación cambia de versión al publicar una corrección", () => {
-  assert.match(serviceWorker, /buffet411-shell-v8/);
+  assert.match(serviceWorker, /buffet411-shell-v9/);
 });
 
 test("el panel solo anuncia pedidos en vivo tras confirmar la conexión remota", async () => {
@@ -39,4 +39,13 @@ test("el panel solo anuncia pedidos en vivo tras confirmar la conexión remota",
   assert.match(staff, /PEDIDOS EN VIVO/);
   assert.match(staff, /SIN PERMISO/);
   assert.match(staff, /No se pudo conectar/);
+});
+
+
+test("el manifiesto PWA incluye iconos PNG de 192 y 512 y uno maskable para Android", async () => {
+  const manifest = JSON.parse(await readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"));
+  assert.ok(manifest.icons.some((icon) => icon.sizes === "192x192" && icon.type === "image/png"));
+  assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "any"));
+  assert.ok(manifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable"));
+  assert.match(serviceWorker, /\.\/icons\/icon-512\.png/);
 });
