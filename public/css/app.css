@@ -160,3 +160,18 @@
 .preview-banner{position:relative;z-index:1;margin-top:18px;margin-bottom:10px;padding:14px 16px;border:1px solid var(--line);border-left:3px solid var(--blue);background:var(--surface);color:var(--text)}
 .preview-banner strong{font-size:12px}
 .preview-banner p{margin:5px 0 0;color:var(--muted);font-size:10px;line-height:1.6}
+
+
+/* Herramientas para gestionar listas grandes de pedidos sin saturar el panel. */
+.staff-order-tools{display:grid;grid-template-columns:minmax(180px,1.5fr) repeat(2,minmax(170px,1fr));gap:10px;margin:16px 0}
+.staff-order-tool{display:grid;gap:6px;min-width:0}
+.staff-order-tool>span{font-size:10px;font-weight:800;color:var(--muted)}
+.staff-order-tool input,.staff-order-tool select{width:100%;min-width:0;min-height:40px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-2);color:var(--text);font:inherit;font-size:11px}
+.staff-order-tool input:focus,.staff-order-tool select:focus{outline:2px solid var(--blue);outline-offset:1px}
+.staff-orders-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}
+.staff-orders-pagination>span{font-size:10px;color:var(--muted);font-weight:700}
+.staff-orders-pagination>div{display:flex;gap:7px}
+.staff-orders-pagination .button{min-height:34px;padding:0 12px;font-size:10px}
+.staff-orders-pagination .button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:760px){.staff-order-tools{grid-template-columns:1fr 1fr}.staff-order-search{grid-column:1/-1}}
+@media(max-width:480px){.staff-order-tools{grid-template-columns:1fr}.staff-order-search{grid-column:auto}.staff-orders-pagination{align-items:flex-start;flex-direction:column}.staff-orders-pagination>div{width:100%}.staff-orders-pagination .button{flex:1}}
