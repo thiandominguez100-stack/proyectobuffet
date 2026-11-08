@@ -215,7 +215,6 @@ registerForm.addEventListener("submit", async (event) => {
     newUser = credential.user;
     await setDoc(doc(db, "users", newUser.uid), {
       uid: newUser.uid,
-      email: newUser.email,
       displayName,
       course,
       division,
