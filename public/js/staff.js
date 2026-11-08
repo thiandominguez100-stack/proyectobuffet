@@ -18,6 +18,7 @@ if (location.hostname.endsWith(".github.io")) {
     onSnapshot,
     query,
     serverTimestamp,
+    setDoc,
     updateDoc,
     where
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
@@ -36,7 +37,9 @@ const enterPanelButton = $("#staff-enter-panel");
 const logoutButton = $("#staff-logout");
 
 let currentAuthorizedUid = null;
+let currentAuthorizedRole = null;
 let stopOrdersListener = null;
+let stopEnrollmentCodesListener = null;
 let orderActionsBusy = new Set();
 const ORDERS_PAGE_SIZE = 25;
 let allOrders = [];
@@ -50,7 +53,10 @@ function showMessage(text, kind = "") {
 
 function stopStaffOrders() {
   if (stopOrdersListener) stopOrdersListener();
+  if (stopEnrollmentCodesListener) stopEnrollmentCodesListener();
   stopOrdersListener = null;
+  stopEnrollmentCodesListener = null;
+  $("#staff-enrollment-tools").hidden = true;
   orderActionsBusy = new Set();
   allOrders = [];
   currentPage = 1;
@@ -59,6 +65,7 @@ function stopStaffOrders() {
 function showLogin(text = "Solo pueden ingresar cuentas con rol de personal o administrador.", kind = "") {
   stopStaffOrders();
   currentAuthorizedUid = null;
+  currentAuthorizedRole = null;
   dashboard.hidden = true;
   authPanel.hidden = false;
   form.hidden = false;
@@ -67,9 +74,10 @@ function showLogin(text = "Solo pueden ingresar cuentas con rol de personal o ad
   showMessage(text, kind);
 }
 
-function showAuthorizedStep(user) {
+function showAuthorizedStep(user, role) {
   stopStaffOrders();
   currentAuthorizedUid = user.uid;
+  currentAuthorizedRole = role;
   dashboard.hidden = true;
   authPanel.hidden = false;
   form.hidden = true;
@@ -79,9 +87,119 @@ function showAuthorizedStep(user) {
 
 async function checkStaffRole(user) {
   const roleSnapshot = await getDoc(doc(db, "staffRoles", user.uid));
-  if (!roleSnapshot.exists()) return false;
+  if (!roleSnapshot.exists()) return null;
   const role = roleSnapshot.data().role;
-  return role === "staff" || role === "admin";
+  return role === "staff" || role === "admin" ? role : null;
+}
+
+function generateEnrollmentCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(16);
+  if (!globalThis.crypto?.getRandomValues) {
+    throw new Error("Este navegador no permite generar códigos seguros.");
+  }
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (value) => alphabet[value & 31]).join("");
+}
+
+function renderEnrollmentCodes(snapshot) {
+  const list = $("#staff-enrollment-code-list");
+  list.replaceChildren();
+  const codes = snapshot.docs.map((item) => item.id).sort();
+  if (!codes.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state compact";
+    empty.textContent = "No hay códigos disponibles.";
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const code of codes) {
+    const row = document.createElement("div");
+    row.className = "staff-enrollment-row";
+    const value = document.createElement("code");
+    value.textContent = code;
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "button button-outline";
+    copy.textContent = "Copiar";
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(code);
+        $("#staff-enrollment-feedback").textContent = "Código copiado. Entregalo solamente al alumno correspondiente.";
+      } catch (error) {
+        $("#staff-enrollment-feedback").textContent = "No se pudo copiar automáticamente. Seleccioná el código y copialo manualmente.";
+      }
+    });
+    const revoke = document.createElement("button");
+    revoke.type = "button";
+    revoke.className = "button button-quiet";
+    revoke.textContent = "Revocar";
+    revoke.addEventListener("click", async () => {
+      if (!window.confirm("¿Revocar este código? Después no podrá utilizarse.")) return;
+      revoke.disabled = true;
+      try {
+        await updateDoc(doc(db, "enrollmentCodes", code), {
+          status: "revoked",
+          revokedAt: serverTimestamp(),
+          revokedBy: auth.currentUser.uid
+        });
+        $("#staff-enrollment-feedback").textContent = "Código revocado.";
+      } catch (error) {
+        console.error("No se pudo revocar el código:", error);
+        $("#staff-enrollment-feedback").textContent = "No se pudo revocar el código. Volvé a intentarlo.";
+        revoke.disabled = false;
+      }
+    });
+    row.append(value, copy, revoke);
+    list.appendChild(row);
+  }
+}
+
+function startEnrollmentCodeManager(user) {
+  const section = $("#staff-enrollment-tools");
+  if (currentAuthorizedRole !== "admin") {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  if (stopEnrollmentCodesListener) stopEnrollmentCodesListener();
+
+  const codesQuery = query(
+    collection(db, "enrollmentCodes"),
+    where("status", "==", "available")
+  );
+  stopEnrollmentCodesListener = onSnapshot(codesQuery, renderEnrollmentCodes, (error) => {
+    console.error("No se pudieron consultar los códigos:", error);
+    $("#staff-enrollment-feedback").textContent = error.code === "permission-denied"
+      ? "Tu cuenta no tiene permiso para administrar códigos."
+      : "No se pudieron cargar los códigos disponibles.";
+  });
+
+  const createButton = $("#staff-enrollment-create");
+  createButton.onclick = async () => {
+    if (!auth.currentUser || auth.currentUser.uid !== user.uid || currentAuthorizedRole !== "admin") {
+      $("#staff-enrollment-feedback").textContent = "La sesión administrativa ya no está vigente. Volvé a ingresar.";
+      return;
+    }
+    createButton.disabled = true;
+    try {
+      const code = generateEnrollmentCode();
+      await setDoc(doc(db, "enrollmentCodes", code), {
+        status: "available",
+        createdAt: serverTimestamp(),
+        createdBy: user.uid
+      });
+      $("#staff-enrollment-feedback").textContent = "Código creado. Copialo y entregalo a un solo alumno.";
+    } catch (error) {
+      console.error("No se pudo crear el código:", error);
+      $("#staff-enrollment-feedback").textContent = error.code === "permission-denied"
+        ? "Firebase rechazó la creación. Verificá que las reglas nuevas estén publicadas y que tu cuenta sea administradora."
+        : error.message || "No se pudo crear el código. Intentá nuevamente.";
+    } finally {
+      createButton.disabled = false;
+    }
+  };
 }
 
 function dateLabel(dateKey) {
@@ -386,13 +504,13 @@ form.addEventListener("submit", async (event) => {
       emailInput.value.trim(),
       passwordInput.value
     );
-    const authorized = await checkStaffRole(credential.user);
-    if (!authorized) {
+    const role = await checkStaffRole(credential.user);
+    if (!role) {
       await signOut(auth);
       showLogin("Esta cuenta no tiene permisos para acceder al panel.", "error");
       return;
     }
-    showAuthorizedStep(credential.user);
+    showAuthorizedStep(credential.user, role);
   } catch (error) {
     console.error("Error de acceso del personal:", error);
     const text = error.code === "auth/invalid-credential"
@@ -411,14 +529,17 @@ enterPanelButton.addEventListener("click", async () => {
   showMessage("Comprobando permisos nuevamente…");
   try {
     const user = auth.currentUser;
-    if (!user || user.uid !== currentAuthorizedUid || !(await checkStaffRole(user))) {
+    const role = user && user.uid === currentAuthorizedUid ? await checkStaffRole(user) : null;
+    if (!user || !role) {
       await signOut(auth);
       showLogin("Tu autorización ya no está vigente. Iniciá sesión nuevamente.", "error");
       return;
     }
+    currentAuthorizedRole = role;
     authPanel.hidden = true;
     dashboard.hidden = false;
     startStaffOrders();
+    if (role === "admin") startEnrollmentCodeManager(user);
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (error) {
     console.error("No se pudieron revalidar los permisos:", error);
@@ -443,9 +564,9 @@ onAuthStateChanged(auth, async (user) => {
   authPanel.hidden = false;
 
   try {
-    const authorized = await checkStaffRole(user);
-    if (authorized) {
-      showAuthorizedStep(user);
+    const role = await checkStaffRole(user);
+    if (role) {
+      showAuthorizedStep(user, role);
     } else {
       await signOut(auth);
       showLogin("Esta cuenta no tiene permisos para acceder al panel.", "error");
