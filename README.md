@@ -47,6 +47,7 @@ Las cuotas gratuitas tienen límites. Se debe supervisar el uso y diseñar la ap
 - Registro e inicio de sesión con Firebase Authentication (correo y contraseña).
 - El registro requiere un código de inscripción individual de un solo uso, emitido desde el panel por una cuenta administradora. El código se consume en la misma transacción que crea el perfil.
 - Verificación obligatoria del correo antes de entrar al catálogo.
+- El frontend solo conecta con Firebase Authentication y Firestore desde `buffet411-f80af.web.app`; los demás dominios funcionan en modo de demostración y no consultan ni escriben datos reales.
 - Perfil de Firestore con nombre para mostrar, curso y división; el correo queda únicamente en Firebase Authentication.
 - El alumno solo puede cambiar su nombre para mostrar; curso, división, rol y estado quedan protegidos.
 - Foto elegida desde el dispositivo, procesada localmente y guardada como JPEG cuadrado comprimido en un documento privado de Firestore (máximo 150.000 caracteres).
