@@ -25,3 +25,6 @@
 .staff-auth-message[data-kind=error]{color:var(--red)}
 .staff-auth-message[data-kind=success]{color:var(--green)}
 #staff-dashboard[hidden]{display:none!important}
+
+/* Evita que el estilo grid del contenedor de acceso anule el atributo hidden. */
+#staff-auth[hidden]{display:none!important}
