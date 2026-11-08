@@ -68,6 +68,14 @@
 
       <div class="security-notice" id="staff-security-notice"><span class="notice-icon">i</span><div><strong id="staff-notice-title">Vista de demostración</strong><p id="staff-notice-text">Esta dirección muestra solo el diseño del panel. No se consultan datos ni se aceptan credenciales desde GitHub Pages.</p></div></div>
 
+      <section class="staff-card staff-enrollment-card" id="staff-enrollment-tools" hidden>
+        <div class="card-heading"><div><span class="eyebrow">ALTAS SEGURAS</span><h3>Códigos de inscripción</h3></div><span class="muted-label">SOLO ADMINISTRACIÓN</span></div>
+        <p>Generá un código distinto para cada alumno y entregáselo directamente. Cada código permite crear una sola cuenta. No publiques ni compartas la lista en grupos.</p>
+        <button class="button button-primary" id="staff-enrollment-create" type="button">Generar código individual</button>
+        <p class="student-auth-feedback" id="staff-enrollment-feedback" role="status" aria-live="polite">Los códigos disponibles aparecerán acá.</p>
+        <div class="staff-enrollment-list" id="staff-enrollment-code-list"><p class="empty-state compact">No hay códigos disponibles.</p></div>
+      </section>
+
       <div class="staff-stats">
         <article class="stat-card"><span>PRÓXIMA JORNADA</span><strong id="staff-next-date">—</strong><small>Próximo día hábil</small></article>
         <article class="stat-card"><span>PEDIDOS RECIBIDOS</span><strong id="staff-orders-count">0</strong><small>Pedidos para preparar</small></article>
