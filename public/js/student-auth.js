@@ -387,6 +387,8 @@ $("#student-refresh-verification").addEventListener("click", async () => {
   if (!auth.currentUser) return;
   try {
     await reload(auth.currentUser);
+    // Refresh the ID token so order listeners receive email_verified=true too.
+    await auth.currentUser.getIdToken(true);
     await loadStudentSession(auth.currentUser);
   } catch (error) {
     console.error(error);
