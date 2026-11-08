@@ -1,0 +1,37 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const [staff, page, styles] = await Promise.all([
+  readFile(new URL("../public/js/staff.js", import.meta.url), "utf8"),
+  readFile(new URL("../public/personal.html", import.meta.url), "utf8"),
+  readFile(new URL("../public/css/app.css", import.meta.url), "utf8")
+]);
+
+test("el panel permite buscar pedidos por alumno, curso, división e identificador", () => {
+  assert.match(page, /id="staff-orders-search"/);
+  assert.match(staff, /order\.displayName[\s\S]*order\.course[\s\S]*order\.division[\s\S]*order\.id/);
+  assert.match(staff, /searchableText\.includes\(search\)/);
+});
+
+test("el panel permite filtrar por recreo y estado", () => {
+  assert.match(page, /id="staff-orders-slot-filter"/);
+  assert.match(page, /id="staff-orders-status-filter"/);
+  assert.match(staff, /order\.pickupSlot !== slot/);
+  assert.match(staff, /order\.status !== status/);
+});
+
+test("el panel pagina 25 pedidos por vez y conserva los controles accesibles", () => {
+  assert.match(staff, /ORDERS_PAGE_SIZE = 25/);
+  assert.match(staff, /slice\(start, start \+ ORDERS_PAGE_SIZE\)/);
+  assert.match(page, /id="staff-orders-page-info"/);
+  assert.match(page, /id="staff-orders-page-prev"/);
+  assert.match(page, /id="staff-orders-page-next"/);
+  assert.match(styles, /\.staff-orders-pagination/);
+});
+
+test("los totales de producción se calculan con todos los pedidos activos, no solo la página visible", () => {
+  assert.match(staff, /const activeOrders = orders\.filter\(\(order\) => order\.status !== "cancelled"\)/);
+  assert.match(staff, /for \(const order of activeOrders\)/);
+  assert.match(staff, /const filteredOrders = getFilteredStaffOrders\(sortedOrders\)/);
+});
