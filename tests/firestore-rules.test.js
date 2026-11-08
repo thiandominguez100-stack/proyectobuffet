@@ -77,7 +77,9 @@ test.beforeEach(async () => {
     await setDoc(doc(db, "enrollmentCodes", code), {
       status: "available",
       createdAt: new Date(),
-      createdBy: "admin-1"
+      createdBy: "admin-1",
+      course: "2°",
+      division: "B"
     });
     await setDoc(doc(db, "schoolDays", "20261201"), {
       open: false,
@@ -108,8 +110,8 @@ function registrationTransaction(db, uid, enrollmentCode) {
     transaction.set(userRef, {
       uid,
       displayName: "Nuevo alumno",
-      course: "2°",
-      division: "B",
+      course: codeSnapshot.data().course,
+      division: codeSnapshot.data().division,
       registrationCodeId: enrollmentCode,
       role: "student",
       active: true,
@@ -130,7 +132,9 @@ test("un administrador puede emitir un código válido", async () => {
   await assertSucceeds(setDoc(doc(db, "enrollmentCodes", newCode), {
     status: "available",
     createdAt: serverTimestamp(),
-    createdBy: "admin-1"
+    createdBy: "admin-1",
+    course: "2°",
+    division: "B"
   }));
 });
 
