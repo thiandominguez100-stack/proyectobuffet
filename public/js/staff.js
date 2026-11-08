@@ -238,6 +238,9 @@ function renderStaffOrders(orders) {
 
 function startStaffOrders() {
   stopStaffOrders();
+  $("#staff-mode-badge").textContent = "PEDIDOS EN VIVO";
+  $("#staff-notice-title").textContent = "Pedidos conectados";
+  $("#staff-notice-text").textContent = "Los pedidos y sus estados se actualizan desde Firestore. La administración de stock y calendario se incorporará en la siguiente etapa.";
   const dateKey = getNextSchoolDate(new Date());
   const number = getDateNumber(dateKey);
   $("#staff-next-date").textContent = dateLabel(dateKey);
