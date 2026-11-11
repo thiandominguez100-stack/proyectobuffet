@@ -9,6 +9,7 @@ import {
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   runTransaction,
   serverTimestamp,
@@ -118,5 +119,37 @@ test("los códigos solo los emite administración y se canjean una sola vez junt
   }));
   await assertFails(runTransaction(otherStudentDb, async (transaction) => {
     await transaction.get(doc(otherStudentDb, "enrollmentCodes", revokedCodeHash));
+  }));
+});
+
+
+test("el stock se puede consultar pero solo el personal puede cambiarlo; calendario reservado a administración", async () => {
+  await testEnv.clearFirestore();
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "staffRoles", "admin-1"), { role: "admin" });
+    await setDoc(doc(context.firestore(), "staffRoles", "staff-1"), { role: "staff" });
+  });
+
+  const adminDb = testEnv.authenticatedContext("admin-1", { email_verified: true }).firestore();
+  const staffDb = testEnv.authenticatedContext("staff-1", { email_verified: true }).firestore();
+  const studentDb = testEnv.authenticatedContext("student-1", { email_verified: true }).firestore();
+
+  const stock = { available: false, updatedAt: serverTimestamp(), updatedBy: "staff-1" };
+  await assertSucceeds(setDoc(doc(staffDb, "catalogSettings", "bizcochos"), stock));
+  await assertSucceeds(getDoc(doc(studentDb, "catalogSettings", "bizcochos")));
+  await assertFails(setDoc(doc(studentDb, "catalogSettings", "facturas"), {
+    ...stock,
+    updatedBy: "student-1"
+  }));
+
+  await assertFails(setDoc(doc(staffDb, "schoolDays", "20261208"), {
+    open: false,
+    label: "Feriado",
+    updatedAt: serverTimestamp()
+  }));
+  await assertSucceeds(setDoc(doc(adminDb, "schoolDays", "20261208"), {
+    open: false,
+    label: "Feriado",
+    updatedAt: serverTimestamp()
   }));
 });
