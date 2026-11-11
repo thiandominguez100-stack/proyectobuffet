@@ -138,14 +138,36 @@
           </nav>
         </section>
       <div class="staff-two-col">
-        <section class="staff-card" id="productos"><div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y stock</h3></div></div><div class="mini-product"><span class="mini-product-mark">B</span><span><strong>Bizcochos</strong><small>Precio inicial: $500</small></span><span class="muted-label">Pendiente</span></div><div class="mini-product"><span class="mini-product-mark">F</span><span><strong>Facturas</strong><small>Precio inicial: $1.000</small></span><span class="muted-label">Pendiente</span></div></section>
+        <section class="staff-card" id="productos">
+          <div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y disponibilidad</h3></div><span class="muted-label">CAMBIOS EN VIVO</span></div>
+          <p class="table-footnote">Pausá un producto cuando se agote. Los alumnos dejarán de poder agregarlo y Firestore rechazará pedidos que lo incluyan.</p>
+          <div id="staff-stock-controls" class="staff-stock-controls" aria-live="polite"><p class="empty-state compact">Cargando disponibilidad…</p></div>
+        </section>
       </div>
 
       <div class="staff-two-col">
-        <section class="staff-card" id="calendario"><div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div><div class="empty-state compact"><span>▦</span><strong>Calendario editable</strong><p>Se podrán marcar feriados, vacaciones y días sin clases.</p></div></section>
-        <section class="staff-card" id="pagos"><div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div><div class="empty-state compact"><span>$</span><strong>Verificación manual</strong><p>El personal podrá confirmar efectivo o Mercado Pago.</p></div></section>
+        <section class="staff-card" id="calendario">
+          <div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div>
+          <p class="table-footnote">Marcá una fecha como habilitada o cerrada. Si está cerrada, el servidor no aceptará pedidos para esa jornada.</p>
+          <form id="staff-schoolday-form" class="staff-settings-form">
+            <label for="staff-schoolday-date">Fecha</label><input id="staff-schoolday-date" type="date" required>
+            <label for="staff-schoolday-open">Estado</label><select id="staff-schoolday-open"><option value="false">Cerrada · No hay clases</option><option value="true">Abierta · Jornada habilitada</option></select>
+            <label for="staff-schoolday-label">Motivo (opcional)</label><input id="staff-schoolday-label" type="text" maxlength="60" placeholder="Ej. Feriado, jornada institucional">
+            <button class="button button-primary" id="staff-schoolday-save" type="submit">Guardar jornada</button>
+          </form>
+          <p id="staff-schoolday-message" class="staff-auth-message" role="status" aria-live="polite"></p>
+        </section>
+        <section class="staff-card" id="pagos">
+          <div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div>
+          <div class="staff-payment-summary">
+            <div><strong id="staff-payment-unpaid">0</strong><span>Sin confirmar</span></div>
+            <div><strong id="staff-payment-review">0</strong><span>Mercado Pago por verificar</span></div>
+            <div><strong id="staff-payment-paid">0</strong><span>Confirmados</span></div>
+          </div>
+          <p class="table-footnote">La confirmación se realiza desde cada pedido con el botón «Confirmar pago». Los totales se actualizan en vivo.</p>
+        </section>
       </div>
-      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos se guardan en Firebase. El stock y el calendario aún no están conectados.</span></div>
+      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos, la disponibilidad y las jornadas se gestionan con Firebase.</span></div>
     </section>
   </main>
   <footer class="site-footer wrap"><span>Buffet 411 · Panel interno</span><span class="footer-status"><i></i> Pedidos conectados</span></footer>
