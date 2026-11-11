@@ -87,6 +87,8 @@ function showAuthorizedStep(user, role) {
   const enrollmentNav = $("#staff-enrollment-nav");
   if (enrollmentAdmin) enrollmentAdmin.hidden = role !== "admin";
   if (enrollmentNav) enrollmentNav.hidden = role !== "admin";
+  const schoolDayForm = $("#staff-schoolday-form");
+  if (schoolDayForm) schoolDayForm.hidden = role !== "admin";
   dashboard.hidden = true;
   authPanel.hidden = false;
   form.hidden = true;
