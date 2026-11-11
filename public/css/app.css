@@ -195,3 +195,19 @@
 .staff-enrollment-revoke input{width:100%;min-height:40px;padding:9px 11px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-2);color:var(--text);font:inherit;font-size:12px}
 .staff-enrollment-revoke small{font-size:9px;color:var(--muted)}
 @media(max-width:440px){.staff-enrollment-revoke>div{grid-template-columns:1fr}}
+
+/* Gestión operativa: stock, calendario y cobros */
+.staff-stock-controls{display:grid;gap:10px}
+.staff-stock-row{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);background:var(--surface-2)}
+.staff-stock-info{display:grid;flex:1;line-height:1.35}
+.staff-stock-info small{color:var(--muted);margin-top:3px}
+.stock-state{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.stock-on{color:var(--green)}.stock-off{color:var(--red)}
+.staff-settings-form{display:grid;gap:9px;max-width:460px}
+.staff-settings-form label{font-size:12px;font-weight:700}
+.staff-settings-form input,.staff-settings-form select{width:100%;min-height:42px;padding:9px 11px;border:1px solid var(--line);background:var(--surface);color:var(--text);font:inherit}
+.staff-payment-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.staff-payment-summary>div{display:grid;gap:4px;padding:14px;background:var(--surface-2);border:1px solid var(--line)}
+.staff-payment-summary strong{font-size:24px;line-height:1.2}
+.staff-payment-summary span{font-size:11px;color:var(--muted)}
+@media(max-width:600px){.staff-stock-row{flex-wrap:wrap}.staff-stock-row .button{width:100%}.staff-payment-summary{grid-template-columns:1fr}.top-actions{gap:8px}.top-actions #install-app{padding-inline:10px;font-size:11px}}
