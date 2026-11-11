@@ -203,10 +203,54 @@ import {
 
   renderCart();
 
+  // Instalación PWA: Chrome/Edge Android muestran el diálogo nativo;
+  // Safari iOS recibe instrucciones para "Añadir a pantalla de inicio".
+  var installButton = document.getElementById("install-app");
+  var installPrompt = null;
+  var isStandalone = window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+
+  function setInstallState() {
+    if (!installButton) return;
+    installButton.hidden = isStandalone;
+    installButton.textContent = "Instalar app";
+    installButton.setAttribute("aria-label", "Instalar Buffet 411 en este dispositivo");
+  }
+
+  setInstallState();
+  window.addEventListener("beforeinstallprompt", function (event) {
+    event.preventDefault();
+    installPrompt = event;
+    setInstallState();
+  });
+  window.addEventListener("appinstalled", function () {
+    isStandalone = true;
+    installPrompt = null;
+    setInstallState();
+  });
+
+  if (installButton) {
+    installButton.addEventListener("click", async function () {
+      if (isStandalone) return;
+      if (installPrompt) {
+        installPrompt.prompt();
+        await installPrompt.userChoice;
+        installPrompt = null;
+        setInstallState();
+        return;
+      }
+      var isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+      var instructions = isIOS
+        ? 'En Safari: tocá Compartir y elegí "Añadir a pantalla de inicio".'
+        : 'En Chrome: abrí el menú ⋮ y elegí "Instalar aplicación" o "Agregar a pantalla principal".';
+      window.alert(instructions);
+    });
+  }
+
   if ("serviceWorker" in navigator && window.location.protocol === "https:") {
     window.addEventListener("load", function () {
       navigator.serviceWorker.register("./sw.js").catch(function () {
-        // La aplicación sigue disponible sin el service worker.
+        // La aplicación sigue disponible aunque falle el registro offline.
       });
     });
   }
