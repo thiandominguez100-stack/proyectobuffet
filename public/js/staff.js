@@ -18,6 +18,7 @@ if (location.hostname.endsWith(".github.io")) {
     onSnapshot,
     query,
     serverTimestamp,
+    setDoc,
     updateDoc,
     where,
     writeBatch
@@ -40,6 +41,7 @@ const logoutButton = $("#staff-logout");
 let currentAuthorizedUid = null;
 let currentAuthorizedRole = null;
 let stopOrdersListener = null;
+let stopCatalogSettings = null;
 let orderActionsBusy = new Set();
 const ORDERS_PAGE_SIZE = 25;
 let allOrders = [];
@@ -53,7 +55,9 @@ function showMessage(text, kind = "") {
 
 function stopStaffOrders() {
   if (stopOrdersListener) stopOrdersListener();
+  if (stopCatalogSettings) stopCatalogSettings();
   stopOrdersListener = null;
+  stopCatalogSettings = null;
   orderActionsBusy = new Set();
   allOrders = [];
   currentPage = 1;
@@ -263,6 +267,12 @@ function renderStaffOrders(orders) {
   }
 
   $("#staff-orders-count").textContent = String(activeOrders.length);
+  const unpaidCount = activeOrders.filter((order) => order.paymentStatus === "unpaid").length;
+  const reviewCount = activeOrders.filter((order) => order.paymentStatus === "pending_review").length;
+  const paidCount = activeOrders.filter((order) => order.paymentStatus === "paid").length;
+  $("#staff-payment-unpaid").textContent = String(unpaidCount);
+  $("#staff-payment-review").textContent = String(reviewCount);
+  $("#staff-payment-paid").textContent = String(paidCount);
   $("#staff-bizcochos-total").textContent = String(totalBizcochos);
   $("#staff-facturas-total").textContent = String(totalFacturas);
   $("#staff-first-bizcochos").textContent = String(first.bizcochos);
@@ -312,6 +322,117 @@ function setOrdersConnectionState(state, title, description) {
   $("#staff-notice-text").textContent = description;
 }
 
+function startStaffSettings() {
+  if (stopCatalogSettings) stopCatalogSettings();
+  const stockContainer = $("#staff-stock-controls");
+  if (!stockContainer) return;
+
+  const products = [
+    { id: "bizcochos", name: "Bizcochos", price: "$500", mark: "B" },
+    { id: "facturas", name: "Facturas", price: "$1.000", mark: "F" }
+  ];
+
+  function renderStock(snapshot) {
+    const states = { bizcochos: true, facturas: true };
+    snapshot.docs.forEach((item) => {
+      if (item.id in states) states[item.id] = item.data().available === true;
+    });
+    stockContainer.replaceChildren();
+    products.forEach((product) => {
+      const row = document.createElement("div");
+      row.className = "staff-stock-row";
+      const mark = document.createElement("span");
+      mark.className = "mini-product-mark";
+      mark.textContent = product.mark;
+      const info = document.createElement("span");
+      info.className = "staff-stock-info";
+      const name = document.createElement("strong");
+      name.textContent = product.name;
+      const price = document.createElement("small");
+      price.textContent = product.price;
+      info.append(name, price);
+      const state = document.createElement("span");
+      state.className = states[product.id] ? "stock-state stock-on" : "stock-state stock-off";
+      state.textContent = states[product.id] ? "Disponible" : "Pausado";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button button-outline";
+      button.textContent = states[product.id] ? "Pausar venta" : "Habilitar";
+      button.addEventListener("click", async () => {
+        if (!auth.currentUser || !currentAuthorizedUid || auth.currentUser.uid !== currentAuthorizedUid) return;
+        button.disabled = true;
+        try {
+          await setDoc(doc(db, "catalogSettings", product.id), {
+            available: !states[product.id],
+            updatedAt: serverTimestamp(),
+            updatedBy: currentAuthorizedUid
+          }, { merge: true });
+        } catch (error) {
+          console.error("No se pudo cambiar la disponibilidad:", error);
+          $("#staff-orders-status").textContent = error.code === "permission-denied"
+            ? "SIN PERMISO PARA CAMBIAR STOCK"
+            : "ERROR AL GUARDAR STOCK";
+        } finally {
+          button.disabled = false;
+        }
+      });
+      row.append(mark, info, state, button);
+      stockContainer.appendChild(row);
+    });
+  }
+
+  stopCatalogSettings = onSnapshot(collection(db, "catalogSettings"), renderStock, (error) => {
+    console.error("No se pudo cargar la disponibilidad:", error);
+    stockContainer.textContent = "No se pudo consultar el stock. Revisá la conexión y las reglas de Firestore.";
+  });
+}
+
+const schoolDayForm = $("#staff-schoolday-form");
+if (schoolDayForm) {
+  schoolDayForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = $("#staff-schoolday-message");
+    if (!currentAuthorizedRole || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+      message.textContent = "Iniciá sesión con una cuenta autorizada.";
+      return;
+    }
+    if (currentAuthorizedRole !== "admin") {
+      message.textContent = "Solo administración puede modificar el calendario escolar.";
+      return;
+    }
+    const date = $("#staff-schoolday-date").value;
+    const label = $("#staff-schoolday-label").value.trim();
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) {
+      message.textContent = "Elegí una fecha válida.";
+      return;
+    }
+    const parsed = new Date(date + "T12:00:00");
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+      message.textContent = "La fecha seleccionada no es válida.";
+      return;
+    }
+    const dateNumber = Number(date.replaceAll("-", ""));
+    const save = $("#staff-schoolday-save");
+    save.disabled = true;
+    message.textContent = "Guardando jornada…";
+    try {
+      await setDoc(doc(db, "schoolDays", String(dateNumber)), {
+        open: $("#staff-schoolday-open").value === "true",
+        label,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      message.textContent = "Jornada guardada. Las reglas de pedidos ya tendrán en cuenta esta fecha.";
+    } catch (error) {
+      console.error("No se pudo guardar la jornada:", error);
+      message.textContent = error.code === "permission-denied"
+        ? "Firebase rechazó el cambio. Se necesita una cuenta administradora y las reglas publicadas."
+        : "No se pudo guardar la jornada. Revisá la conexión e intentá nuevamente.";
+    } finally {
+      save.disabled = false;
+    }
+  });
+}
+
 function startStaffOrders() {
   stopStaffOrders();
   setOrdersConnectionState(
@@ -339,7 +460,7 @@ function startStaffOrders() {
       setOrdersConnectionState(
         "PEDIDOS EN VIVO",
         "Pedidos conectados",
-        "La conexión con Firestore está confirmada. Los pedidos y sus estados se actualizan en tiempo real. La administración de stock y calendario se incorporará en la siguiente etapa."
+        "La conexión con Firestore está confirmada. Pedidos, pagos y disponibilidad se actualizan en tiempo real."
       );
     }
     allOrders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
@@ -551,6 +672,7 @@ enterPanelButton.addEventListener("click", async () => {
     authPanel.hidden = true;
     dashboard.hidden = false;
     startStaffOrders();
+    startStaffSettings();
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (error) {
     console.error("No se pudieron revalidar los permisos:", error);
