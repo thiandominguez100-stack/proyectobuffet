@@ -241,6 +241,18 @@ service cloud.firestore {
       allow delete: if signedIn() && request.auth.uid == uid;
     }
 
+    match /catalogSettings/{productId} {
+      allow get, list: if signedIn();
+      allow create, update: if isStaff()
+        && productId in ['bizcochos', 'facturas']
+        && request.resource.data.keys().hasOnly(['available', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasAll(['available', 'updatedAt', 'updatedBy'])
+        && request.resource.data.available is bool
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
+    }
+
     match /schoolDays/{dateNumber} {
       allow get, list: if signedIn();
       allow create, update, delete: if isAdmin()
@@ -272,6 +284,12 @@ service cloud.firestore {
         && validNextSchoolDate(request.resource.data.serviceDateAt, request.resource.data.serviceDateNumber)
         && request.resource.data.dailyTotalId == request.auth.uid + '_' + string(request.resource.data.serviceDateNumber)
         && validOrderItems(request.resource.data)
+        && (request.resource.data.items.bizcochos == 0
+          || !exists(/databases/$(database)/documents/catalogSettings/bizcochos)
+          || get(/databases/$(database)/documents/catalogSettings/bizcochos).data.available == true)
+        && (request.resource.data.items.facturas == 0
+          || !exists(/databases/$(database)/documents/catalogSettings/facturas)
+          || get(/databases/$(database)/documents/catalogSettings/facturas).data.available == true)
         && request.resource.data.pickupSlot in ['primer-recreo', 'ultimo-recreo']
         && request.resource.data.paymentMethod in ['cash', 'mercadopago']
         && (
