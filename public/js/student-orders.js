@@ -47,6 +47,8 @@ let serviceDateKey = "";
 let serviceDateNumber = 0;
 let stopDailyTotal = null;
 let stopOrders = null;
+let stopCatalog = null;
+let catalogAvailability = { bizcochos: true, facturas: true };
 let authLoadToken = 0;
 let placingOrder = false;
 
@@ -97,8 +99,10 @@ function prepareServiceDate() {
 function stopStudentListeners() {
   if (stopDailyTotal) stopDailyTotal();
   if (stopOrders) stopOrders();
+  if (stopCatalog) stopCatalog();
   stopDailyTotal = null;
   stopOrders = null;
+  stopCatalog = null;
   dailyQuantity = 0;
   updateDailyCounter();
 }
@@ -174,6 +178,24 @@ async function connectStudent(user, token) {
 
   studentProfile = profile;
   prepareServiceDate();
+
+  stopCatalog = onSnapshot(collection(db, "catalogSettings"), (snapshot) => {
+    if (token !== authLoadToken) return;
+    catalogAvailability = { bizcochos: true, facturas: true };
+    snapshot.docs.forEach((item) => {
+      if (item.id in catalogAvailability) {
+        catalogAvailability[item.id] = item.data().available === true;
+      }
+    });
+    document.dispatchEvent(new CustomEvent("b411:catalog-updated", {
+      detail: { ...catalogAvailability }
+    }));
+  }, (error) => {
+    console.error("No se pudo consultar la disponibilidad:", error);
+    document.dispatchEvent(new CustomEvent("b411:catalog-updated", {
+      detail: { bizcochos: true, facturas: true, unknown: true }
+    }));
+  });
 
   const totalRef = doc(db, "dailyOrderTotals", user.uid + "_" + serviceDateNumber);
   stopDailyTotal = onSnapshot(totalRef, (snapshot) => {
@@ -269,6 +291,16 @@ checkoutForm.addEventListener("submit", async (event) => {
   try {
     await runTransaction(db, async (transaction) => {
       const totalSnapshot = await transaction.get(totalRef);
+      const bizcochosRef = doc(db, "catalogSettings", "bizcochos");
+      const facturasRef = doc(db, "catalogSettings", "facturas");
+      const bizcochosSnapshot = currentCart.bizcochos > 0 ? await transaction.get(bizcochosRef) : null;
+      const facturasSnapshot = currentCart.facturas > 0 ? await transaction.get(facturasRef) : null;
+      if (currentCart.bizcochos > 0 && bizcochosSnapshot?.exists() && bizcochosSnapshot.data().available !== true) {
+        throw new Error("Los bizcochos no están disponibles en este momento.");
+      }
+      if (currentCart.facturas > 0 && facturasSnapshot?.exists() && facturasSnapshot.data().available !== true) {
+        throw new Error("Las facturas no están disponibles en este momento.");
+      }
       const oldQuantity = totalSnapshot.exists() ? Number(totalSnapshot.data().quantity || 0) : 0;
       const oldOrderCount = totalSnapshot.exists() ? Number(totalSnapshot.data().orderCount || 0) : 0;
       if (oldQuantity + quantity > 5) {

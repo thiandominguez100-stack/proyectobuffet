@@ -63,6 +63,7 @@ import {
   var feedback = document.querySelector("[data-cart-feedback]");
   var checkoutButton = document.querySelector("#checkout-open");
   var bookedQuantity = 0;
+  var productAvailability = { bizcochos: true, facturas: true };
 
   function showFeedback(message, kind) {
     if (!feedback) return;
@@ -140,10 +141,19 @@ import {
     }
 
     document.querySelectorAll("[data-add-product]").forEach(function (button) {
-      button.disabled = combinedCount >= 5;
-      button.classList.toggle("button-disabled", combinedCount >= 5);
-      button.textContent = combinedCount >= 5 ? "Límite diario alcanzado" :
-        (button.dataset.addProduct === "bizcochos" ? "Agregar bizcochos" : "Agregar facturas");
+      var productId = button.dataset.addProduct;
+      var available = productAvailability[productId] !== false;
+      var limited = combinedCount >= 5;
+      button.disabled = !available || limited;
+      button.classList.toggle("button-disabled", !available || limited);
+      button.textContent = !available ? "No disponible" : limited ? "Límite diario alcanzado" :
+        (productId === "bizcochos" ? "Agregar bizcochos" : "Agregar facturas");
+      var card = button.closest(".product-card");
+      var dot = card?.querySelector(".availability-dot");
+      if (dot) {
+        dot.setAttribute("aria-label", available ? "Disponible" : "No disponible");
+        dot.title = available ? "Disponible" : "No disponible";
+      }
     });
 
     document.dispatchEvent(new CustomEvent("b411:cart-updated", {
@@ -153,6 +163,14 @@ import {
 
   document.addEventListener("b411:daily-total", function (event) {
     bookedQuantity = Math.max(0, Math.min(5, Number(event.detail.quantity || 0)));
+    renderCart();
+  });
+
+  document.addEventListener("b411:catalog-updated", function (event) {
+    productAvailability = {
+      bizcochos: event.detail.bizcochos !== false,
+      facturas: event.detail.facturas !== false
+    };
     renderCart();
   });
 
@@ -203,10 +221,54 @@ import {
 
   renderCart();
 
+  // Instalación PWA: Chrome/Edge Android muestran el diálogo nativo;
+  // Safari iOS recibe instrucciones para "Añadir a pantalla de inicio".
+  var installButton = document.getElementById("install-app");
+  var installPrompt = null;
+  var isStandalone = window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+
+  function setInstallState() {
+    if (!installButton) return;
+    installButton.hidden = isStandalone;
+    installButton.textContent = "Instalar app";
+    installButton.setAttribute("aria-label", "Instalar Buffet 411 en este dispositivo");
+  }
+
+  setInstallState();
+  window.addEventListener("beforeinstallprompt", function (event) {
+    event.preventDefault();
+    installPrompt = event;
+    setInstallState();
+  });
+  window.addEventListener("appinstalled", function () {
+    isStandalone = true;
+    installPrompt = null;
+    setInstallState();
+  });
+
+  if (installButton) {
+    installButton.addEventListener("click", async function () {
+      if (isStandalone) return;
+      if (installPrompt) {
+        installPrompt.prompt();
+        await installPrompt.userChoice;
+        installPrompt = null;
+        setInstallState();
+        return;
+      }
+      var isIOS = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+      var instructions = isIOS
+        ? 'En Safari: tocá Compartir y elegí "Añadir a pantalla de inicio".'
+        : 'En Chrome: abrí el menú ⋮ y elegí "Instalar aplicación" o "Agregar a pantalla principal".';
+      window.alert(instructions);
+    });
+  }
+
   if ("serviceWorker" in navigator && window.location.protocol === "https:") {
     window.addEventListener("load", function () {
       navigator.serviceWorker.register("./sw.js").catch(function () {
-        // La aplicación sigue disponible sin el service worker.
+        // La aplicación sigue disponible aunque falle el registro offline.
       });
     });
   }

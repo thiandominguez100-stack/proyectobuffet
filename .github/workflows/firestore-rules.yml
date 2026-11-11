@@ -1,0 +1,30 @@
+name: Firestore Rules Emulator
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  firestore-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Configurar Java para Firestore Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Instalar herramientas de prueba
+        run: npm install --no-save firebase@13.2.0 @firebase/rules-unit-testing@6.0.0 firebase-tools@15.35.0
+      - name: Ejecutar pruebas reales de reglas en el emulador
+        run: npx firebase emulators:exec --only firestore --project demo-buffet411-enrollment "node --test tests/firestore-rules.emulator.mjs"

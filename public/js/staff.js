@@ -18,10 +18,13 @@ if (location.hostname.endsWith(".github.io")) {
     onSnapshot,
     query,
     serverTimestamp,
+    setDoc,
     updateDoc,
-    where
+    where,
+    writeBatch
   } = await import("https://www.gstatic.com/firebasejs/13.2.0/firebase-firestore.js");
   const { formatARS, getNextSchoolDate, getDateNumber } = await import("./domain.js");
+  const { generateEnrollmentCode, hashEnrollmentCode, formatEnrollmentCode } = await import("./enrollment-codes.js");
 
 const $ = (selector) => document.querySelector(selector);
 const form = $("#staff-login-form");
@@ -36,7 +39,9 @@ const enterPanelButton = $("#staff-enter-panel");
 const logoutButton = $("#staff-logout");
 
 let currentAuthorizedUid = null;
+let currentAuthorizedRole = null;
 let stopOrdersListener = null;
+let stopCatalogSettings = null;
 let orderActionsBusy = new Set();
 const ORDERS_PAGE_SIZE = 25;
 let allOrders = [];
@@ -50,7 +55,9 @@ function showMessage(text, kind = "") {
 
 function stopStaffOrders() {
   if (stopOrdersListener) stopOrdersListener();
+  if (stopCatalogSettings) stopCatalogSettings();
   stopOrdersListener = null;
+  stopCatalogSettings = null;
   orderActionsBusy = new Set();
   allOrders = [];
   currentPage = 1;
@@ -59,6 +66,11 @@ function stopStaffOrders() {
 function showLogin(text = "Solo pueden ingresar cuentas con rol de personal o administrador.", kind = "") {
   stopStaffOrders();
   currentAuthorizedUid = null;
+  currentAuthorizedRole = null;
+  const enrollmentAdmin = $("#staff-enrollment-admin");
+  const enrollmentNav = $("#staff-enrollment-nav");
+  if (enrollmentAdmin) enrollmentAdmin.hidden = true;
+  if (enrollmentNav) enrollmentNav.hidden = true;
   dashboard.hidden = true;
   authPanel.hidden = false;
   form.hidden = false;
@@ -67,9 +79,16 @@ function showLogin(text = "Solo pueden ingresar cuentas con rol de personal o ad
   showMessage(text, kind);
 }
 
-function showAuthorizedStep(user) {
+function showAuthorizedStep(user, role) {
   stopStaffOrders();
   currentAuthorizedUid = user.uid;
+  currentAuthorizedRole = role;
+  const enrollmentAdmin = $("#staff-enrollment-admin");
+  const enrollmentNav = $("#staff-enrollment-nav");
+  if (enrollmentAdmin) enrollmentAdmin.hidden = role !== "admin";
+  if (enrollmentNav) enrollmentNav.hidden = role !== "admin";
+  const schoolDayForm = $("#staff-schoolday-form");
+  if (schoolDayForm) schoolDayForm.hidden = role !== "admin";
   dashboard.hidden = true;
   authPanel.hidden = false;
   form.hidden = true;
@@ -79,9 +98,9 @@ function showAuthorizedStep(user) {
 
 async function checkStaffRole(user) {
   const roleSnapshot = await getDoc(doc(db, "staffRoles", user.uid));
-  if (!roleSnapshot.exists()) return false;
+  if (!roleSnapshot.exists()) return null;
   const role = roleSnapshot.data().role;
-  return role === "staff" || role === "admin";
+  return role === "staff" || role === "admin" ? role : null;
 }
 
 function dateLabel(dateKey) {
@@ -250,6 +269,12 @@ function renderStaffOrders(orders) {
   }
 
   $("#staff-orders-count").textContent = String(activeOrders.length);
+  const unpaidCount = activeOrders.filter((order) => order.paymentStatus === "unpaid").length;
+  const reviewCount = activeOrders.filter((order) => order.paymentStatus === "pending_review").length;
+  const paidCount = activeOrders.filter((order) => order.paymentStatus === "paid").length;
+  $("#staff-payment-unpaid").textContent = String(unpaidCount);
+  $("#staff-payment-review").textContent = String(reviewCount);
+  $("#staff-payment-paid").textContent = String(paidCount);
   $("#staff-bizcochos-total").textContent = String(totalBizcochos);
   $("#staff-facturas-total").textContent = String(totalFacturas);
   $("#staff-first-bizcochos").textContent = String(first.bizcochos);
@@ -299,6 +324,117 @@ function setOrdersConnectionState(state, title, description) {
   $("#staff-notice-text").textContent = description;
 }
 
+function startStaffSettings() {
+  if (stopCatalogSettings) stopCatalogSettings();
+  const stockContainer = $("#staff-stock-controls");
+  if (!stockContainer) return;
+
+  const products = [
+    { id: "bizcochos", name: "Bizcochos", price: "$500", mark: "B" },
+    { id: "facturas", name: "Facturas", price: "$1.000", mark: "F" }
+  ];
+
+  function renderStock(snapshot) {
+    const states = { bizcochos: true, facturas: true };
+    snapshot.docs.forEach((item) => {
+      if (item.id in states) states[item.id] = item.data().available === true;
+    });
+    stockContainer.replaceChildren();
+    products.forEach((product) => {
+      const row = document.createElement("div");
+      row.className = "staff-stock-row";
+      const mark = document.createElement("span");
+      mark.className = "mini-product-mark";
+      mark.textContent = product.mark;
+      const info = document.createElement("span");
+      info.className = "staff-stock-info";
+      const name = document.createElement("strong");
+      name.textContent = product.name;
+      const price = document.createElement("small");
+      price.textContent = product.price;
+      info.append(name, price);
+      const state = document.createElement("span");
+      state.className = states[product.id] ? "stock-state stock-on" : "stock-state stock-off";
+      state.textContent = states[product.id] ? "Disponible" : "Pausado";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button button-outline";
+      button.textContent = states[product.id] ? "Pausar venta" : "Habilitar";
+      button.addEventListener("click", async () => {
+        if (!auth.currentUser || !currentAuthorizedUid || auth.currentUser.uid !== currentAuthorizedUid) return;
+        button.disabled = true;
+        try {
+          await setDoc(doc(db, "catalogSettings", product.id), {
+            available: !states[product.id],
+            updatedAt: serverTimestamp(),
+            updatedBy: currentAuthorizedUid
+          }, { merge: true });
+        } catch (error) {
+          console.error("No se pudo cambiar la disponibilidad:", error);
+          $("#staff-orders-status").textContent = error.code === "permission-denied"
+            ? "SIN PERMISO PARA CAMBIAR STOCK"
+            : "ERROR AL GUARDAR STOCK";
+        } finally {
+          button.disabled = false;
+        }
+      });
+      row.append(mark, info, state, button);
+      stockContainer.appendChild(row);
+    });
+  }
+
+  stopCatalogSettings = onSnapshot(collection(db, "catalogSettings"), renderStock, (error) => {
+    console.error("No se pudo cargar la disponibilidad:", error);
+    stockContainer.textContent = "No se pudo consultar el stock. Revisá la conexión y las reglas de Firestore.";
+  });
+}
+
+const schoolDayForm = $("#staff-schoolday-form");
+if (schoolDayForm) {
+  schoolDayForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = $("#staff-schoolday-message");
+    if (!currentAuthorizedRole || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+      message.textContent = "Iniciá sesión con una cuenta autorizada.";
+      return;
+    }
+    if (currentAuthorizedRole !== "admin") {
+      message.textContent = "Solo administración puede modificar el calendario escolar.";
+      return;
+    }
+    const date = $("#staff-schoolday-date").value;
+    const label = $("#staff-schoolday-label").value.trim();
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) {
+      message.textContent = "Elegí una fecha válida.";
+      return;
+    }
+    const parsed = new Date(date + "T12:00:00");
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+      message.textContent = "La fecha seleccionada no es válida.";
+      return;
+    }
+    const dateNumber = Number(date.replaceAll("-", ""));
+    const save = $("#staff-schoolday-save");
+    save.disabled = true;
+    message.textContent = "Guardando jornada…";
+    try {
+      await setDoc(doc(db, "schoolDays", String(dateNumber)), {
+        open: $("#staff-schoolday-open").value === "true",
+        label,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      message.textContent = "Jornada guardada. Las reglas de pedidos ya tendrán en cuenta esta fecha.";
+    } catch (error) {
+      console.error("No se pudo guardar la jornada:", error);
+      message.textContent = error.code === "permission-denied"
+        ? "Firebase rechazó el cambio. Se necesita una cuenta administradora y las reglas publicadas."
+        : "No se pudo guardar la jornada. Revisá la conexión e intentá nuevamente.";
+    } finally {
+      save.disabled = false;
+    }
+  });
+}
+
 function startStaffOrders() {
   stopStaffOrders();
   setOrdersConnectionState(
@@ -326,7 +462,7 @@ function startStaffOrders() {
       setOrdersConnectionState(
         "PEDIDOS EN VIVO",
         "Pedidos conectados",
-        "La conexión con Firestore está confirmada. Los pedidos y sus estados se actualizan en tiempo real. La administración de stock y calendario se incorporará en la siguiente etapa."
+        "La conexión con Firestore está confirmada. Pedidos, pagos y disponibilidad se actualizan en tiempo real."
       );
     }
     allOrders = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
@@ -376,6 +512,119 @@ $("#staff-orders-page-next").addEventListener("click", () => {
   renderStaffOrders(allOrders);
 });
 
+const enrollmentForm = $("#staff-enrollment-form");
+const enrollmentMessage = $("#staff-enrollment-message");
+const enrollmentOutput = $("#staff-enrollment-output");
+
+if (enrollmentForm) {
+  enrollmentForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (currentAuthorizedRole !== "admin" || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+      enrollmentMessage.textContent = "Solo una cuenta administradora puede generar códigos.";
+      return;
+    }
+
+    const course = $("#staff-enrollment-course").value.trim();
+    const division = $("#staff-enrollment-division").value.trim();
+    const count = Number($("#staff-enrollment-count").value);
+    if (!course || course.length > 12 || !division || division.length > 8 ||
+        !Number.isSafeInteger(count) || count < 1 || count > 10) {
+      enrollmentMessage.textContent = "Revisá el curso, la división y la cantidad (1 a 10).";
+      return;
+    }
+
+    const generateButton = $("#staff-enrollment-submit");
+    generateButton.disabled = true;
+    enrollmentMessage.textContent = "Generando códigos seguros…";
+    $("#staff-enrollment-results").hidden = true;
+
+    try {
+      const batch = writeBatch(db);
+      const generatedCodes = [];
+      const generatedHashes = new Set();
+
+      while (generatedCodes.length < count) {
+        const code = generateEnrollmentCode();
+        const codeHash = await hashEnrollmentCode(code);
+        if (generatedHashes.has(codeHash)) continue;
+        generatedHashes.add(codeHash);
+        batch.set(doc(db, "enrollmentCodes", codeHash), {
+          status: "available",
+          course,
+          division,
+          createdBy: currentAuthorizedUid,
+          createdAt: serverTimestamp()
+        });
+        generatedCodes.push(formatEnrollmentCode(code));
+      }
+
+      await batch.commit();
+      enrollmentOutput.value = generatedCodes.join("\n");
+      $("#staff-enrollment-results").hidden = false;
+      enrollmentMessage.textContent = generatedCodes.length + " código(s) creado(s). Guardalos y entregalos individualmente.";
+    } catch (error) {
+      console.error("No se pudieron generar los códigos de inscripción:", error);
+      enrollmentMessage.textContent = error.code === "permission-denied"
+        ? "Firebase rechazó la operación. Se necesita una cuenta administradora y las reglas nuevas."
+        : "No se pudieron generar los códigos. No se guardó ningún lote; intentá nuevamente.";
+    } finally {
+      generateButton.disabled = false;
+    }
+  });
+}
+
+const enrollmentRevokeButton = $("#staff-enrollment-revoke");
+if (enrollmentRevokeButton) {
+  enrollmentRevokeButton.addEventListener("click", async () => {
+    if (currentAuthorizedRole !== "admin" || !auth.currentUser || auth.currentUser.uid !== currentAuthorizedUid) {
+      enrollmentMessage.textContent = "Solo una cuenta administradora puede anular códigos.";
+      return;
+    }
+
+    const codeInput = $("#staff-enrollment-revoke-code");
+    const rawCode = codeInput.value.trim();
+    let codeHash;
+    try {
+      codeHash = await hashEnrollmentCode(rawCode);
+    } catch (error) {
+      enrollmentMessage.textContent = "Ingresá un código completo y válido para anularlo.";
+      codeInput.focus();
+      return;
+    }
+
+    enrollmentRevokeButton.disabled = true;
+    try {
+      await updateDoc(doc(db, "enrollmentCodes", codeHash), {
+        status: "revoked",
+        revokedBy: currentAuthorizedUid,
+        revokedAt: serverTimestamp()
+      });
+      codeInput.value = "";
+      enrollmentMessage.textContent = "Código anulado. Ya no se puede utilizar para crear una cuenta.";
+    } catch (error) {
+      console.error("No se pudo anular el código:", error);
+      enrollmentMessage.textContent = error.code === "permission-denied"
+        ? "No se pudo anular: el código ya fue usado, no existe o las reglas aún no están publicadas."
+        : "No se pudo anular el código. Revisá la conexión e intentá nuevamente.";
+    } finally {
+      enrollmentRevokeButton.disabled = false;
+    }
+  });
+}
+
+const enrollmentCopyButton = $("#staff-enrollment-copy");
+if (enrollmentCopyButton) {
+  enrollmentCopyButton.addEventListener("click", async () => {
+    if (!enrollmentOutput?.value) return;
+    try {
+      await navigator.clipboard.writeText(enrollmentOutput.value);
+      enrollmentMessage.textContent = "Códigos copiados. Guardalos en un lugar seguro.";
+    } catch (error) {
+      enrollmentMessage.textContent = "No se pudo acceder al portapapeles. Seleccioná el texto y copialo manualmente.";
+    }
+  });
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   submitButton.disabled = true;
@@ -386,13 +635,13 @@ form.addEventListener("submit", async (event) => {
       emailInput.value.trim(),
       passwordInput.value
     );
-    const authorized = await checkStaffRole(credential.user);
-    if (!authorized) {
+    const role = await checkStaffRole(credential.user);
+    if (!role) {
       await signOut(auth);
       showLogin("Esta cuenta no tiene permisos para acceder al panel.", "error");
       return;
     }
-    showAuthorizedStep(credential.user);
+    showAuthorizedStep(credential.user, role);
   } catch (error) {
     console.error("Error de acceso del personal:", error);
     const text = error.code === "auth/invalid-credential"
@@ -411,14 +660,21 @@ enterPanelButton.addEventListener("click", async () => {
   showMessage("Comprobando permisos nuevamente…");
   try {
     const user = auth.currentUser;
-    if (!user || user.uid !== currentAuthorizedUid || !(await checkStaffRole(user))) {
+    const role = user ? await checkStaffRole(user) : null;
+    if (!user || user.uid !== currentAuthorizedUid || !role) {
       await signOut(auth);
       showLogin("Tu autorización ya no está vigente. Iniciá sesión nuevamente.", "error");
       return;
     }
+    currentAuthorizedRole = role;
+    const enrollmentAdmin = $("#staff-enrollment-admin");
+    const enrollmentNav = $("#staff-enrollment-nav");
+    if (enrollmentAdmin) enrollmentAdmin.hidden = role !== "admin";
+    if (enrollmentNav) enrollmentNav.hidden = role !== "admin";
     authPanel.hidden = true;
     dashboard.hidden = false;
     startStaffOrders();
+    startStaffSettings();
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (error) {
     console.error("No se pudieron revalidar los permisos:", error);
@@ -443,9 +699,9 @@ onAuthStateChanged(auth, async (user) => {
   authPanel.hidden = false;
 
   try {
-    const authorized = await checkStaffRole(user);
-    if (authorized) {
-      showAuthorizedStep(user);
+    const role = await checkStaffRole(user);
+    if (role) {
+      showAuthorizedStep(user, role);
     } else {
       await signOut(auth);
       showLogin("Esta cuenta no tiene permisos para acceder al panel.", "error");

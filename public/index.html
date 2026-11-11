@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0d2a40">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <meta name="description" content="Buffet 411: encargos del buffet escolar.">
   <title>Buffet 411 | Alumnos</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
@@ -33,6 +36,7 @@
         <button class="button button-quiet student-logout" id="student-logout" type="button">Salir</button>
       </div>
       <a class="button button-outline" href="./personal.html">Acceso del personal</a>
+      <button class="button button-outline" type="button" id="install-app">Instalar app</button>
       <button class="icon-button" type="button" data-toggle-theme aria-label="Cambiar tema" title="Cambiar tema">◐</button>
     </nav>
   </header>
@@ -64,14 +68,12 @@
             <label for="student-register-name">Nombre para mostrar</label>
             <input id="student-register-name" name="displayName" type="text" minlength="2" maxlength="32" autocomplete="nickname" placeholder="Cómo querés aparecer" required>
           </div>
-          <div>
-            <label for="student-register-course">Curso</label>
-            <input id="student-register-course" name="course" type="text" maxlength="12" placeholder="Ej. 3°" required>
+          <div class="student-form-wide">
+            <label for="student-register-code">Código único de inscripción</label>
+            <input id="student-register-code" name="enrollmentCode" type="text" minlength="16" maxlength="19" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-JKMN-PQRS" required>
+            <small>Pedí tu código personal al personal del buffet. Se puede usar una sola vez.</small>
           </div>
-          <div>
-            <label for="student-register-division">División</label>
-            <input id="student-register-division" name="division" type="text" maxlength="8" placeholder="Ej. A" required>
-          </div>
+          <p class="student-form-note student-form-wide">Tu curso y división se asignarán automáticamente según el código que te entregaron.</p>
           <div class="student-form-wide">
             <label for="student-register-email">Correo electrónico</label>
             <input id="student-register-email" name="email" type="email" autocomplete="email" placeholder="tu correo electrónico" required>

@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0d2a40">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <meta name="description" content="Panel interno de gestión del Buffet 411.">
   <title>Buffet 411 | Personal</title>
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
@@ -21,7 +24,8 @@
       <span class="brand-mark">B<span>411</span></span>
       <span class="brand-copy"><strong>Buffet 411</strong><small>Panel del personal</small></span>
     </a>
-    <nav class="top-actions"><a class="nav-link" href="./index.html">Vista de alumnos</a><button class="icon-button" type="button" data-toggle-theme aria-label="Cambiar tema" title="Cambiar tema">◐</button></nav>
+    <nav class="top-actions"><a class="nav-link" href="./index.html">Vista de alumnos</a><button class="button button-outline" type="button" id="install-app">Instalar app</button>
+      <button class="icon-button" type="button" data-toggle-theme aria-label="Cambiar tema" title="Cambiar tema">◐</button></nav>
   </header>
 
   <section class="staff-auth-wrap wrap" id="staff-auth">
@@ -56,6 +60,7 @@
         <a class="sidebar-item selected" href="#resumen"><span>▦</span> Resumen</a>
         <a class="sidebar-item" href="#produccion"><span>▤</span> Producción</a>
         <a class="sidebar-item" href="#pedidos"><span>≡</span> Pedidos</a>
+        <a class="sidebar-item" id="staff-enrollment-nav" href="#inscripciones" hidden><span>⌑</span> Inscripciones</a>
         <a class="sidebar-item" href="#productos"><span>◇</span> Productos y stock</a>
         <a class="sidebar-item" href="#calendario"><span>▦</span> Calendario</a>
         <a class="sidebar-item" href="#pagos"><span>$</span> Pagos</a>
@@ -67,6 +72,40 @@
       <div class="staff-heading" id="resumen"><div><span class="eyebrow">PANEL OPERATIVO</span><h2>Resumen de producción</h2><p>Vista del área de personal.</p></div><span class="prototype-badge" id="staff-mode-badge"><i></i> VISTA DE MUESTRA</span></div>
 
       <div class="security-notice" id="staff-security-notice"><span class="notice-icon">i</span><div><strong id="staff-notice-title">Vista de demostración</strong><p id="staff-notice-text">Esta dirección muestra solo el diseño del panel. No se consultan datos ni se aceptan credenciales desde GitHub Pages.</p></div></div>
+
+      <section class="staff-card" id="staff-enrollment-admin" hidden>
+        <div class="card-heading">
+          <div><span class="eyebrow">ALTAS DE ALUMNOS</span><h3>Códigos únicos de inscripción</h3></div>
+          <span class="muted-label">SOLO ADMINISTRACIÓN</span>
+        </div>
+        <p class="table-footnote">Cada código habilita una sola cuenta. El curso y la división se asignan desde el código, no desde lo que escribe el alumno. Los códigos se muestran una sola vez: guardalos y entregalos individualmente.</p>
+        <form id="staff-enrollment-form" class="staff-enrollment-form">
+          <label>Curso
+            <input id="staff-enrollment-course" type="text" maxlength="12" placeholder="Ej. 3°" required>
+          </label>
+          <label>División
+            <input id="staff-enrollment-division" type="text" maxlength="8" placeholder="Ej. A" required>
+          </label>
+          <label>Cantidad de códigos
+            <input id="staff-enrollment-count" type="number" min="1" max="10" value="1" required>
+          </label>
+          <button class="button button-primary" id="staff-enrollment-submit" type="submit">Generar códigos</button>
+        </form>
+        <p class="staff-auth-message" id="staff-enrollment-message" role="status" aria-live="polite"></p>
+        <div id="staff-enrollment-results" hidden>
+          <label for="staff-enrollment-output">Códigos nuevos (guardalos antes de cerrar esta pantalla)</label>
+          <textarea id="staff-enrollment-output" rows="7" readonly spellcheck="false"></textarea>
+          <button class="button button-outline" id="staff-enrollment-copy" type="button">Copiar códigos</button>
+        </div>
+        <div class="staff-enrollment-revoke">
+          <label for="staff-enrollment-revoke-code">Anular un código que todavía no se utilizó</label>
+          <div>
+            <input id="staff-enrollment-revoke-code" type="text" minlength="16" maxlength="19" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-JKMN-PQRS">
+            <button class="button button-outline" id="staff-enrollment-revoke" type="button">Anular código</button>
+          </div>
+          <small>Un código ya canjeado no se puede reutilizar ni anular.</small>
+        </div>
+      </section>
 
       <div class="staff-stats">
         <article class="stat-card"><span>PRÓXIMA JORNADA</span><strong id="staff-next-date">—</strong><small>Próximo día hábil</small></article>
@@ -99,14 +138,36 @@
           </nav>
         </section>
       <div class="staff-two-col">
-        <section class="staff-card" id="productos"><div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y stock</h3></div></div><div class="mini-product"><span class="mini-product-mark">B</span><span><strong>Bizcochos</strong><small>Precio inicial: $500</small></span><span class="muted-label">Pendiente</span></div><div class="mini-product"><span class="mini-product-mark">F</span><span><strong>Facturas</strong><small>Precio inicial: $1.000</small></span><span class="muted-label">Pendiente</span></div></section>
+        <section class="staff-card" id="productos">
+          <div class="card-heading"><div><span class="eyebrow">CATÁLOGO</span><h3>Productos y disponibilidad</h3></div><span class="muted-label">CAMBIOS EN VIVO</span></div>
+          <p class="table-footnote">Pausá un producto cuando se agote. Los alumnos dejarán de poder agregarlo y Firestore rechazará pedidos que lo incluyan.</p>
+          <div id="staff-stock-controls" class="staff-stock-controls" aria-live="polite"><p class="empty-state compact">Cargando disponibilidad…</p></div>
+        </section>
       </div>
 
       <div class="staff-two-col">
-        <section class="staff-card" id="calendario"><div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div><div class="empty-state compact"><span>▦</span><strong>Calendario editable</strong><p>Se podrán marcar feriados, vacaciones y días sin clases.</p></div></section>
-        <section class="staff-card" id="pagos"><div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div><div class="empty-state compact"><span>$</span><strong>Verificación manual</strong><p>El personal podrá confirmar efectivo o Mercado Pago.</p></div></section>
+        <section class="staff-card" id="calendario">
+          <div class="card-heading"><div><span class="eyebrow">JORNADAS</span><h3>Calendario escolar</h3></div></div>
+          <p class="table-footnote">Marcá una fecha como habilitada o cerrada. Si está cerrada, el servidor no aceptará pedidos para esa jornada.</p>
+          <form id="staff-schoolday-form" class="staff-settings-form">
+            <label for="staff-schoolday-date">Fecha</label><input id="staff-schoolday-date" type="date" required>
+            <label for="staff-schoolday-open">Estado</label><select id="staff-schoolday-open"><option value="false">Cerrada · No hay clases</option><option value="true">Abierta · Jornada habilitada</option></select>
+            <label for="staff-schoolday-label">Motivo (opcional)</label><input id="staff-schoolday-label" type="text" maxlength="60" placeholder="Ej. Feriado, jornada institucional">
+            <button class="button button-primary" id="staff-schoolday-save" type="submit">Guardar jornada</button>
+          </form>
+          <p id="staff-schoolday-message" class="staff-auth-message" role="status" aria-live="polite"></p>
+        </section>
+        <section class="staff-card" id="pagos">
+          <div class="card-heading"><div><span class="eyebrow">COBROS</span><h3>Control de pagos</h3></div></div>
+          <div class="staff-payment-summary">
+            <div><strong id="staff-payment-unpaid">0</strong><span>Sin confirmar</span></div>
+            <div><strong id="staff-payment-review">0</strong><span>Mercado Pago por verificar</span></div>
+            <div><strong id="staff-payment-paid">0</strong><span>Confirmados</span></div>
+          </div>
+          <p class="table-footnote">La confirmación se realiza desde cada pedido con el botón «Confirmar pago». Los totales se actualizan en vivo.</p>
+        </section>
       </div>
-      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos se guardan en Firebase. El stock y el calendario aún no están conectados.</span></div>
+      <div class="staff-bottom-link"><button class="button button-outline" id="staff-logout" type="button">Cerrar sesión</button><a class="button button-outline" href="./index.html">← Volver a la página de alumnos</a><span>Los pedidos, la disponibilidad y las jornadas se gestionan con Firebase.</span></div>
     </section>
   </main>
   <footer class="site-footer wrap"><span>Buffet 411 · Panel interno</span><span class="footer-status"><i></i> Pedidos conectados</span></footer>

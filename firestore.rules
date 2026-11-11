@@ -37,6 +37,10 @@ service cloud.firestore {
 
     function validNextSchoolDate(dateAt, dateNumber) {
       let schoolDayPath = /databases/$(database)/documents/schoolDays/$(string(dateNumber));
+      let nextDay = dateAt > request.time
+        && dateAt < request.time + duration.value(1, 'd');
+      let nextMonday = dateAt > request.time + duration.value(2, 'd')
+        && dateAt < request.time + duration.value(3, 'd');
       return dateAt is timestamp
         && dateNumber is int
         && dateAt.hours() == 3
@@ -47,17 +51,15 @@ service cloud.firestore {
         // Se permite pedir de lunes a viernes y los domingos; sábado queda cerrado.
         && (request.time.dayOfWeek() < 6 || request.time.dayOfWeek() == 7)
         && (
-          // Lunes a jueves: siguiente día calendario.
-          (request.time.dayOfWeek() < 5
-            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
+          // Lunes a jueves y domingo: próxima medianoche argentina.
+          ((request.time.dayOfWeek() < 5 || request.time.dayOfWeek() == 7)
+            && nextDay
+            && dateAt.dayOfWeek() == (request.time.dayOfWeek() == 7 ? 1 : request.time.dayOfWeek() + 1))
           ||
-          // Viernes: próxima jornada escolar, el lunes.
+          // Viernes: el lunes siguiente, incluso al cambiar de mes o año.
           (request.time.dayOfWeek() == 5
-            && dateAt.date() == request.time.date() + duration.value(3, 'd'))
-          ||
-          // Domingo: próxima jornada escolar, el lunes.
-          (request.time.dayOfWeek() == 7
-            && dateAt.date() == request.time.date() + duration.value(1, 'd'))
+            && nextMonday
+            && dateAt.dayOfWeek() == 1)
         )
         && (!exists(schoolDayPath) || get(schoolDayPath).data.open == true);
     }
@@ -120,6 +122,64 @@ service cloud.firestore {
         || (oldStatus == 'ready' && newStatus == 'delivered');
     }
 
+    function codeRedemptionMatchesProfile(codeHash) {
+      let profilePath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return existsAfter(profilePath)
+        && getAfter(profilePath).data.uid == request.auth.uid
+        && getAfter(profilePath).data.role == 'student'
+        && getAfter(profilePath).data.enrollmentCodeHash == codeHash
+        && getAfter(profilePath).data.course == resource.data.course
+        && getAfter(profilePath).data.division == resource.data.division;
+    }
+
+    function profileHasValidEnrollmentCode(uid, profileData) {
+      let codePath = /databases/$(database)/documents/enrollmentCodes/$(profileData.enrollmentCodeHash);
+      return profileData.enrollmentCodeHash is string
+        && profileData.enrollmentCodeHash.size() == 64
+        && profileData.enrollmentCodeHash.matches('^[a-f0-9]+$')
+        && exists(codePath)
+        && get(codePath).data.status == 'available'
+        && get(codePath).data.course == profileData.course
+        && get(codePath).data.division == profileData.division
+        && existsAfter(codePath)
+        && getAfter(codePath).data.status == 'redeemed'
+        && getAfter(codePath).data.redeemedBy == uid
+        && getAfter(codePath).data.redeemedAt == request.time;
+    }
+
+    match /enrollmentCodes/{codeHash} {
+      allow get: if isAdmin()
+        || (signedIn() && resource.data.status == 'available');
+      allow list: if isAdmin();
+      allow create: if isAdmin()
+        && codeHash.size() == 64
+        && codeHash.matches('^[a-f0-9]+$')
+        && request.resource.data.keys().hasOnly(['status', 'course', 'division', 'createdBy', 'createdAt'])
+        && request.resource.data.keys().hasAll(['status', 'course', 'division', 'createdBy', 'createdAt'])
+        && request.resource.data.status == 'available'
+        && request.resource.data.course is string
+        && request.resource.data.course.size() >= 1
+        && request.resource.data.course.size() <= 12
+        && request.resource.data.division is string
+        && request.resource.data.division.size() >= 1
+        && request.resource.data.division.size() <= 8
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update: if (isAdmin()
+        && resource.data.status == 'available'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedBy', 'revokedAt'])
+        && request.resource.data.status == 'revoked'
+        && request.resource.data.revokedBy == request.auth.uid
+        && request.resource.data.revokedAt == request.time)
+        || (signedIn()
+        && resource.data.status == 'available'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'redeemedBy', 'redeemedAt'])
+        && request.resource.data.status == 'redeemed'
+        && request.resource.data.redeemedBy == request.auth.uid
+        && request.resource.data.redeemedAt == request.time
+        && codeRedemptionMatchesProfile(codeHash));
+      allow delete: if false;
+    }
     match /staffRoles/{uid} {
       allow get: if signedIn() && request.auth.uid == uid;
       allow list, create, update, delete: if false;
@@ -133,11 +193,11 @@ service cloud.firestore {
         && request.auth.uid == uid
         && request.auth.token.email_verified == false
         && request.resource.data.keys().hasOnly([
-          'uid', 'displayName', 'course', 'division',
+          'uid', 'displayName', 'course', 'division', 'enrollmentCodeHash',
           'role', 'active', 'createdAt', 'updatedAt'
         ])
         && request.resource.data.keys().hasAll([
-          'uid', 'displayName', 'course', 'division',
+          'uid', 'displayName', 'course', 'division', 'enrollmentCodeHash',
           'role', 'active', 'createdAt', 'updatedAt'
         ])
         && request.resource.data.uid == uid
@@ -152,6 +212,7 @@ service cloud.firestore {
         && request.resource.data.division.size() <= 8
         && request.resource.data.role == 'student'
         && request.resource.data.active == true
+        && profileHasValidEnrollmentCode(uid, request.resource.data)
         && request.resource.data.createdAt is timestamp
         && request.resource.data.updatedAt is timestamp;
 
@@ -178,6 +239,18 @@ service cloud.firestore {
         && request.resource.data.photoData.matches('data:image/jpeg;base64,[A-Za-z0-9+/=]+')
         && request.resource.data.updatedAt is timestamp;
       allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /catalogSettings/{productId} {
+      allow get, list: if signedIn();
+      allow create, update: if isStaff()
+        && productId in ['bizcochos', 'facturas']
+        && request.resource.data.keys().hasOnly(['available', 'updatedAt', 'updatedBy'])
+        && request.resource.data.keys().hasAll(['available', 'updatedAt', 'updatedBy'])
+        && request.resource.data.available is bool
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if false;
     }
 
     match /schoolDays/{dateNumber} {
@@ -211,6 +284,12 @@ service cloud.firestore {
         && validNextSchoolDate(request.resource.data.serviceDateAt, request.resource.data.serviceDateNumber)
         && request.resource.data.dailyTotalId == request.auth.uid + '_' + string(request.resource.data.serviceDateNumber)
         && validOrderItems(request.resource.data)
+        && (request.resource.data.items.bizcochos == 0
+          || !exists(/databases/$(database)/documents/catalogSettings/bizcochos)
+          || get(/databases/$(database)/documents/catalogSettings/bizcochos).data.available == true)
+        && (request.resource.data.items.facturas == 0
+          || !exists(/databases/$(database)/documents/catalogSettings/facturas)
+          || get(/databases/$(database)/documents/catalogSettings/facturas).data.available == true)
         && request.resource.data.pickupSlot in ['primer-recreo', 'ultimo-recreo']
         && request.resource.data.paymentMethod in ['cash', 'mercadopago']
         && (
